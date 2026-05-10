@@ -1,0 +1,7 @@
+{
+    "PROJECT_NAME": "rpa_challenge",
+    "PATH_BASE": "C:\\Users\\Marco\\Documents\\PythonFolder\\RPA_CHALLENGE",
+    "PATH_URL": "https://rpachallenge.com/",
+    "PATH_IN": "C:\\Users\\Marco\\Documents\\PythonFolder\\RPA_CHALLENGE\\Entrada",
+    "PATH_OUT": "C:\\Users\\Marco\\Documents\\PythonFolder\\RPA_CHALLENGE\\Saida"
+}
