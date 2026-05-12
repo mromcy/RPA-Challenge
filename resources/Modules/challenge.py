@@ -6,23 +6,26 @@
 
 import time
 
-import pandas as pd
 from playwright.sync_api import Page
 
 from resources.Modules.locators import LocatorChallenge
+from resources.Schemas.item_run import Item
+from resources.Tools.logs import Logs
 
 
 class Challenge:
     """Classe responsável pelas interações com a página do RPA Challenge."""
 
-    def __init__(self, page: Page) -> None:
+    def __init__(self, page: Page, logs: Logs) -> None:
         """
         Inicializa a classe com a página do Playwright e resolve os localizadores.
 
         Args:
             page: Instância da página do Playwright já criada pelo browser.
+            logs: Instância de Logs para registro das operações.
         """
         self.page = page
+        self.logs = logs
         loc = LocatorChallenge
 
         # Resolve cada localizador uma única vez para reutilização nos métodos
@@ -35,6 +38,7 @@ class Challenge:
         self.input_address = loc.input_address(page)
         self.input_email = loc.input_email(page)
         self.input_phone_number = loc.input_phone_number(page)
+        self.resultado_final = loc.resultado_final(page)
 
     def iniciar_desafio(self, url: str) -> None:
         """
@@ -45,39 +49,41 @@ class Challenge:
         Args:
             url: URL do sistema a ser acessado, proveniente das configurações.
         """
-        # Navega para a página inicial do desafio
+        self.logs.info("Navegando para a URL do RPA Challenge.")
         self.page.goto(url)
         self.btn_start.click()
+        self.logs.info("Desafio iniciado com sucesso.")
 
-    def preencher_formulario(self, row: pd.Series) -> None:
+    def preencher_formulario(self, item: Item) -> None:
         """
-        Preenche todos os campos do formulário com os dados de uma linha da planilha
+        Preenche todos os campos do formulário com os dados do item lido do banco
         e clica em 'Submit'.
 
         Args:
-            row: Linha do DataFrame pandas contendo os dados do registro atual.
-                 Espera as colunas: 'First Name', 'Last Name', 'Company Name',
-                 'Role in Company', 'Address', 'Email', 'Phone Number'.
+            item: Schema Pydantic com os dados do registro atual,
+                  lido da tabela item via get_queued_items_by_run.
         """
-        # Preenche cada campo do formulário com o valor correspondente da linha
-        self.input_first_name.fill(str(row['First Name']))
-        self.input_last_name.fill(str(row['Last Name']))
-        self.input_company_name.fill(str(row['Company Name']))
-        self.input_role_in_company.fill(str(row['Role in Company']))
-        self.input_address.fill(str(row['Address']))
-        self.input_email.fill(str(row['Email']))
-        self.input_phone_number.fill(str(row['Phone Number']))
+        self.logs.info(f'Preenchendo formulário: {item.First_Name} {item.Last_Name}.')
+        self.input_first_name.fill(item.First_Name)
+        self.input_last_name.fill(item.Last_Name)
+        self.input_company_name.fill(item.Company_Name)
+        self.input_role_in_company.fill(item.Role_in_Company)
+        self.input_address.fill(item.Address)
+        self.input_email.fill(item.Email)
+        self.input_phone_number.fill(item.Phone_Number)
 
         # Envia o formulário após preencher todos os campos
         self.btn_submit.click()
 
-    def aguardar_resultado(self, segundos: int = 5) -> None:
+    def capturar_resultado(self):
         """
         Aguarda após o envio do último formulário para que o resultado
-        final do desafio seja exibido na tela antes de fechar o navegador.
+        final do desafio seja exibido e capturado antes de fechar o navegador.
 
         Args:
             segundos: Tempo de espera em segundos. Padrão: 5.
         """
-        # Aguarda para visualização do resultado final antes do encerramento
-        time.sleep(segundos)
+        resultado = self.resultado_final.text_content()
+        self.logs.info(resultado)
+        
+        return resultado

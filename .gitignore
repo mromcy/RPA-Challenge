@@ -1,0 +1,59 @@
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# =============================================================================
+# Ambiente virtual
+# =============================================================================
+.venv/
+venv/
+env/
+
+# =============================================================================
+# Credenciais — NUNCA commitar
+# =============================================================================
+# Pasta gerada em runtime com credenciais Fernet do banco
+secret/
+
+# Conteúdo real das credenciais em SECRETS/ (mantém .gitkeep para estrutura)
+SECRETS/**/credentials.json
+SECRETS/**/secret.key
+SECRETS/**/*.key
+
+# =============================================================================
+# Diretórios de runtime (mantém .gitkeep para preservar a pasta no repo)
+# =============================================================================
+logs/*
+!logs/.gitkeep
+
+downloads/*
+!downloads/.gitkeep
+
+Saida/*
+!Saida/.gitkeep
+
+# =============================================================================
+# Dados de entrada (comentado por padrão — o challenge.xlsx oficial pode ficar)
+# Descomente se não quiser versionar arquivos de dados
+# =============================================================================
+# Entrada/*.xlsx
+# !Entrada/.gitkeep
+
+# =============================================================================
+# IDEs e editores
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =============================================================================
+# Sistema operacional
+# =============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini

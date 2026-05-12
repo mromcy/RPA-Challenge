@@ -54,3 +54,8 @@ class LocatorChallenge:
     def input_phone_number(page: Page) -> Locator:
         """Retorna o campo de entrada 'Phone Number' do formulário."""
         return page.locator("//label[text()='Phone Number']/following-sibling::input")
+
+    @staticmethod
+    def resultado_final(page: Page) -> Locator:
+        """Retorna o resultado final do desafio."""
+        return page.get_by_text("Your success rate")

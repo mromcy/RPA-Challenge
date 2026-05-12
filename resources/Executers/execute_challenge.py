@@ -1,71 +1,82 @@
 """
-1 - Executa as funcionalidades do sistema automatizado.
-2 - Responsável pela orquestração do fluxo do RPA Challenge.
-3 - Gerencia o ciclo de vida do navegador e a leitura da planilha.
+1 - Funções de passos da execução do RPA Challenge.
+2 - Responsável pela leitura de dados e pela automação do formulário.
+3 - Recebe (page, logs) como parâmetros, seguindo o padrão do projeto.
 """
 
-from pathlib import Path
-
 import pandas as pd
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Page
 
+from resources.models import ItemRunStatus
 from resources.Modules.challenge import Challenge
-from resources.settings import Settings
+from resources.Schemas.item_run import ItemInfo
+from resources.Tools.logs import Logs
+from resources.Utils.ler_arquivo import LerArquivo
+from resources.Utils.operation_db import OperationDb
 
 
-def carregar_planilha(caminho: str) -> pd.DataFrame:
+def ler_dados(logs: Logs) -> pd.DataFrame:
     """
-    Carrega a planilha de dados do desafio a partir do caminho informado.
+    Lê os arquivos .xlsx da pasta de entrada e retorna um DataFrame consolidado.
 
     Args:
-        caminho: Caminho completo para o arquivo .xlsx.
+        logs: Instância de Logs para registro das operações.
 
     Returns:
-        DataFrame pandas com os dados da planilha.
+        DataFrame com os dados tratados e prontos para uso.
     """
-    # Lê o arquivo Excel e retorna o DataFrame com todos os registros
-    return pd.read_excel(caminho)
+    logs.info("Lendo arquivo de entrada.")
+    dados = LerArquivo(logs).ler_arquivo()
+    logs.info(f"{len(dados)} registros carregados com sucesso.")
+    return dados
 
 
-def executar_challenge() -> None:
+def executar_challenge(
+    page: Page,
+    logs: Logs,
+    items: list[ItemInfo],
+    url: str,
+    db: OperationDb,
+) -> None:
     """
-    Orquestra a execução completa do RPA Challenge.
+    Executa o fluxo completo do RPA Challenge: navega para a URL, inicia o desafio
+    e preenche o formulário para cada item lido do banco.
 
-    Fluxo:
-        1. Carrega as configurações do config.json.
-        2. Carrega os dados da planilha da pasta de entrada.
-        3. Inicia o navegador Playwright.
-        4. Instancia o Challenge e navega para a URL do desafio.
-        5. Itera sobre cada linha da planilha e preenche o formulário.
-        6. Aguarda a exibição do resultado final.
-        7. Fecha o navegador.
+    Para cada item, atualiza o status no banco:
+    QUEUED → PROCESSING → COMPLETED (ou FAILED em caso de erro).
+
+    Args:
+        page: Instância da página do Playwright.
+        logs: Instância de Logs para registro das operações.
+        items: Lista de ItemInfo lidos do banco com status QUEUED.
+        url: URL do RPA Challenge.
+        db: Instância de OperationDb para atualização de status por item.
     """
-    settings = Settings()  # pyright: ignore[reportCallIssue]
+    total = len(items)
+    logs.info("Iniciando desafio.")
+    challenge = Challenge(page, logs)
+    challenge.iniciar_desafio(url)
 
-    # Busca o primeiro .xlsx encontrado na pasta de entrada — independente do nome do arquivo
-    arquivos = list(Path(settings.PATH_IN).glob('*.xlsx'))
-    if not arquivos:
-        raise FileNotFoundError(f'Nenhum arquivo .xlsx encontrado em: {settings.PATH_IN}')
-    caminho_planilha = str(arquivos[0])
+    item_ids: list[int] = []
+    for i, item_info in enumerate(items, 1):
+        item_id = item_info.item_run.item_id  # type: ignore[union-attr]
+        logs.info(f"Preenchendo formulário {i}/{total}.")
 
-    # Carrega os dados antes de abrir o navegador — falha cedo se o arquivo estiver corrompido
-    dados = carregar_planilha(caminho_planilha)
+        db.update_item_run_status(item_id, ItemRunStatus.PROCESSING)
+        try:
+            challenge.preencher_formulario(item_info.item)  # type: ignore[arg-type]
+            db.update_item_run_status(item_id, ItemRunStatus.COMPLETED)
+            item_ids.append(item_id)
+        except Exception as e:
+            db.update_item_run_status(
+                item_id,
+                ItemRunStatus.FAILED,
+                exception_reason=str(e),
+            )
+            raise
 
-    with sync_playwright() as p:
-        # Inicializa o navegador em modo visível com janela maximizada
-        browser = p.chromium.launch(headless=False, args=['--start-maximized'])
-        page = browser.new_page(no_viewport=True)
-
-        challenge = Challenge(page)
-
-        # Navega para a URL configurada e inicia o desafio
-        challenge.iniciar_desafio(settings.PATH_URL)
-
-        # Itera sobre cada linha da planilha e preenche o formulário correspondente
-        for _, row in dados.iterrows():
-            challenge.preencher_formulario(row)
-
-        # Aguarda o resultado final antes de encerrar
-        challenge.aguardar_resultado()
-
-        browser.close()
+    logs.info("Aguardando resultado final.")
+    resultado = challenge.capturar_resultado()
+    if resultado:
+        db.update_items_result(item_ids, resultado)
+    logs.info("Execução concluída com sucesso.")
