@@ -1,0 +1,15 @@
+{
+    "PROJECT_NAME": "rpa_challenge",
+    "AREA": "Hiperautomação",
+    "SERVER_BOTCITY": "https://developers.botcity.dev/",
+    "LOGIN_BOTCITY": "<seu_login_botcity>",
+    "KEY_BOTCITY": "<sua_chave_botcity>",
+    "PATH_BASE": "<caminho absoluto para a raiz do projeto>",
+    "PATH_URL": "https://rpachallenge.com/",
+    "PATH_IN": "<caminho absoluto para a pasta Entrada>",
+    "PATH_OUT": "<caminho absoluto para a pasta Saida>",
+    "HOST_DB_POSTGRES": "localhost",
+    "PORT_DB_POSTGRES": 5432,
+    "DB_NAME_POSTGRES": "<nome_do_banco>",
+    "DB_SCHEMA": "rpa_challenge"
+}

@@ -11,13 +11,14 @@ Responsabilidades:
 
 import traceback
 
-from botcity.maestro import BotMaestroSDK
+from botcity.maestro import AutomationTaskFinishStatus, BotMaestroSDK
 from playwright.sync_api import sync_playwright
 
 from resources.Executers.execute_challenge import executar_challenge, ler_dados
 from resources.models import ProcessRunStatus
 from resources.settings import Settings
 from resources.Tools.add_process_run import AddProcessRun
+from resources.Tools.botcity import login  # noqa
 from resources.Tools.logs import Logs
 from resources.Utils.create_items import create_items
 from resources.Utils.operation_db import OperationDb
@@ -39,7 +40,15 @@ class Execute:
     """
 
     def __init__(self):
+        self.maestro = BotMaestroSDK()
         self.maestro = BotMaestroSDK.from_sys_args()
+
+        if not self.maestro.task_id:
+            print("Executando em modo local (sem task_id).")
+            self.execution = None
+        else:
+            self.execution = self.maestro.get_execution()
+
         self.logs = Logs(self.maestro)
         self.settings = Settings()  # type: ignore[call-arg]
         self.db = OperationDb()
@@ -67,6 +76,8 @@ class Execute:
         self.db.update_process_run_status(self.run_id, ProcessRunStatus.RUNNING)
         self.logs.info(f'run_id={self.run_id} → RUNNING')
 
+        total = processed = failed = 0
+
         try:
             # Lê o Excel e persiste item_run + item no banco
             dados = ler_dados(self.logs)
@@ -75,16 +86,29 @@ class Execute:
 
             # Lê do banco os itens prontos para processamento
             items = self.db.get_queued_items_by_run(self.run_id)
-            self.logs.info(f'{len(items)} itens carregados do banco para processamento.')
+            total = len(items)
+            self.logs.info(f'{total} itens carregados do banco para processamento.')
 
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=False, args=['--start-maximized'])
                 page = browser.new_page(no_viewport=True)
-                executar_challenge(page, self.logs, items, self.settings.PATH_URL, self.db)
+                processed, failed = executar_challenge(
+                    page, self.logs, items, self.settings.PATH_URL, self.db
+                )
                 browser.close()
 
             self.db.update_process_run_status(self.run_id, ProcessRunStatus.COMPLETED)
             self.logs.info(f'run_id={self.run_id} → COMPLETED')
+
+            if self.maestro.task_id:
+                self.maestro.finish_task(
+                    task_id=str(self.maestro.task_id),
+                    status=AutomationTaskFinishStatus.SUCCESS,
+                    message=(f'Execução concluída com sucesso. Processados: {processed} - Falhados: {failed} - Total de itens: {total}'),
+                    total_items=total,
+                    processed_items=processed,
+                    failed_items=failed,
+                )
 
         except Exception as e:
             # Captura o stacktrace completo para diagnóstico no banco
@@ -97,4 +121,14 @@ class Execute:
             )
             self.logs.error(e)
             self.logs.info(f'run_id={self.run_id} → FAILED')
+
+            if self.maestro.task_id:
+                self.maestro.finish_task(
+                    task_id=str(self.maestro.task_id),
+                    status=AutomationTaskFinishStatus.FAILED,
+                    message=str(e),
+                    total_items=total,
+                    processed_items=processed,
+                    failed_items=failed,
+                )
             raise

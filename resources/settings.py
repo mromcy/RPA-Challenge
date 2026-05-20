@@ -20,10 +20,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Configurações do projeto carregadas e validadas a partir do config.json."""
 
-    model_config = SettingsConfigDict(extra='ignore')
+    model_config = SettingsConfigDict(extra="ignore")
 
     PROJECT_NAME: str
     AREA: str
+
+    SERVER_BOTCITY: str
+    LOGIN_BOTCITY: str
+    KEY_BOTCITY: str
+
     PATH_BASE: str
     PATH_URL: str
     PATH_IN: str
@@ -38,21 +43,21 @@ class Settings(BaseSettings):
     @property
     def PATH_LOGS(self) -> str:
         """Retorna o caminho da pasta de logs, criando-a se não existir."""
-        path = Path(self.PATH_BASE) / 'logs'
+        path = Path(self.PATH_BASE) / "logs"
         path.mkdir(parents=True, exist_ok=True)
         return str(path)
 
     @property
     def PATH_DOWNLOADS(self) -> str:
         """Retorna o caminho da pasta de downloads, criando-a se não existir."""
-        path = Path(self.PATH_BASE) / 'downloads'
+        path = Path(self.PATH_BASE) / "downloads"
         path.mkdir(parents=True, exist_ok=True)
         return str(path)
 
     @property
     def PATH_SECRETS(self) -> str:
         """Retorna o caminho da pasta de segredos, criando-a se não existir."""
-        path = Path(self.PATH_BASE) / 'secret'
+        path = Path(self.PATH_BASE) / "secret"
         path.mkdir(parents=True, exist_ok=True)
         return str(path)
 
@@ -64,11 +69,11 @@ class Settings(BaseSettings):
         Returns:
             str: URL no formato postgresql+psycopg://usuario:senha@host:porta/banco.
         """
-        user_db, pass_db = Cryptography().ler_credenciais('db_credentials')
+        user_db, pass_db = Cryptography().ler_credenciais("db_credentials")
         return (
-            f'postgresql+psycopg://{user_db}:'
-            f'{pass_db}@{self.HOST_DB_POSTGRES}:'
-            f'{self.PORT_DB_POSTGRES}/{self.DB_NAME_POSTGRES}'
+            f"postgresql+psycopg://{user_db}:"
+            f"{pass_db}@{self.HOST_DB_POSTGRES}:"
+            f"{self.PORT_DB_POSTGRES}/{self.DB_NAME_POSTGRES}"
         )
 
     @classmethod
@@ -83,15 +88,16 @@ class Settings(BaseSettings):
         """Define o config.json como fonte principal de configuração."""
 
         def json_config_settings_source() -> dict[str, Any]:
-            # Resolve o caminho do JSON relativo a este arquivo — portável entre máquinas
-            json_path = Path(__file__).parent.parent / 'config.json'
+            json_path = Path(
+                r"C:\Users\Marco\Documents\PythonFolder\RPA_CHALLENGE\config.json"
+            )
 
             if not json_path.exists():
                 raise FileNotFoundError(
-                    f'Arquivo de configuração não encontrado em: {json_path}'
+                    f"Arquivo de configuração não encontrado em: {json_path}"
                 )
 
-            with json_path.open('r', encoding='utf-8-sig') as f:
+            with json_path.open("r", encoding="utf-8-sig") as f:
                 return json.load(f)
 
         return (
@@ -143,11 +149,11 @@ class Cryptography:
             Exception: Se o arquivo secret.key não for encontrado.
         """
         try:
-            key_path = os.path.join(self._path_secrets, credentials, 'secret.key')
-            return open(key_path, 'rb').read()
+            key_path = os.path.join(self._path_secrets, credentials, "secret.key")
+            return open(key_path, "rb").read()
         except IOError:
             raise Exception(
-                f'Chave não encontrada em: {self._path_secrets}\\{credentials}\\secret.key'
+                f"Chave não encontrada em: {self._path_secrets}\\{credentials}\\secret.key"
             )
 
     @staticmethod
@@ -168,7 +174,7 @@ class Cryptography:
         try:
             return Fernet(key).decrypt(valor_criptografado.encode()).decode()
         except Exception as e:
-            raise SystemError(f'Erro ao descriptografar credencial: {e}')
+            raise SystemError(f"Erro ao descriptografar credencial: {e}")
 
     def ler_credenciais(self, credentials: str) -> tuple[str, str]:
         """
@@ -187,20 +193,20 @@ class Cryptography:
         """
         try:
             credentials_path = os.path.join(
-                self._path_secrets, credentials, 'credentials.json'
+                self._path_secrets, credentials, "credentials.json"
             )
             key = self.__pegar_chave(credentials)
 
-            with open(credentials_path, 'r', encoding='utf-8') as f:
+            with open(credentials_path, "r", encoding="utf-8") as f:
                 creds = json.load(f)
 
-            usuario = self.__descriptografar(creds['email'], key)
-            senha = self.__descriptografar(creds['password'], key)
+            usuario = self.__descriptografar(creds["email"], key)
+            senha = self.__descriptografar(creds["password"], key)
 
             return usuario, senha
         except FileNotFoundError as e:
-            raise FileNotFoundError(f'Arquivo de credenciais não encontrado: {e}')
+            raise FileNotFoundError(f"Arquivo de credenciais não encontrado: {e}")
         except SystemError:
             raise
         except Exception as e:
-            raise SystemError(f'Erro ao ler credenciais: {e}')
+            raise SystemError(f"Erro ao ler credenciais: {e}")

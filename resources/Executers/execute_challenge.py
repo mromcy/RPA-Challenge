@@ -37,7 +37,7 @@ def executar_challenge(
     items: list[ItemInfo],
     url: str,
     db: OperationDb,
-) -> None:
+) -> tuple[int, int]:
     """
     Executa o fluxo completo do RPA Challenge: navega para a URL, inicia o desafio
     e preenche o formulário para cada item lido do banco.
@@ -51,6 +51,9 @@ def executar_challenge(
         items: Lista de ItemInfo lidos do banco com status QUEUED.
         url: URL do RPA Challenge.
         db: Instância de OperationDb para atualização de status por item.
+
+    Returns:
+        tuple[int, int]: (processados_com_sucesso, processados_com_falha)
     """
     total = len(items)
     logs.info("Iniciando desafio.")
@@ -58,6 +61,8 @@ def executar_challenge(
     challenge.iniciar_desafio(url)
 
     item_ids: list[int] = []
+    processed = failed = 0
+
     for i, item_info in enumerate(items, 1):
         item_id = item_info.item_run.item_id  # type: ignore[union-attr]
         logs.info(f"Preenchendo formulário {i}/{total}.")
@@ -67,12 +72,15 @@ def executar_challenge(
             challenge.preencher_formulario(item_info.item)  # type: ignore[arg-type]
             db.update_item_run_status(item_id, ItemRunStatus.COMPLETED)
             item_ids.append(item_id)
+            processed += 1
+
         except Exception as e:
             db.update_item_run_status(
                 item_id,
                 ItemRunStatus.FAILED,
                 exception_reason=str(e),
             )
+            failed += 1
             raise
 
     logs.info("Aguardando resultado final.")
@@ -80,3 +88,4 @@ def executar_challenge(
     if resultado:
         db.update_items_result(item_ids, resultado)
     logs.info("Execução concluída com sucesso.")
+    return processed, failed

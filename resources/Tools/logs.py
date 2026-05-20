@@ -83,7 +83,7 @@ class Logs:
         msg = str(erro)
         self._logger.error(msg, *args, **kwargs)
         self._save_log_to_db('ERROR', msg)
-        self._save_log_to_botcity(msg)
+        self._save_log_to_botcity(erro)
 
     def exception(self, message, *args, **kwargs):
         self._logger.exception(message, *args, **kwargs)
@@ -94,10 +94,12 @@ class Logs:
         self._logger.critical(message, *args, **kwargs)
         self._save_log_to_db('CRITICAL', message)
 
-    def _save_log_to_botcity(self, message: str):
+    def _save_log_to_botcity(self, exception):
         if self._local_execution:
             return
-        self.maestro.error(task_id=self.maestro.task_id, exception=message)
+        if not isinstance(exception, BaseException):
+            return
+        self.maestro.error(task_id=self.maestro.task_id, exception=exception)
 
     def _save_log_to_db(self, level: str, message: str):
         pass

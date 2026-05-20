@@ -16,6 +16,9 @@ env/
 # =============================================================================
 # Credenciais — NUNCA commitar
 # =============================================================================
+# Configuração local com caminhos e credenciais reais
+config.json
+
 # Pasta gerada em runtime com credenciais Fernet do banco
 secret/
 
@@ -57,3 +60,9 @@ Saida/*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# =============================================================================
+# Arquivos de distribuição
+# =============================================================================
+*.zip
+*.tar.gz
