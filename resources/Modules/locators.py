@@ -58,4 +58,4 @@ class LocatorChallenge:
     @staticmethod
     def resultado_final(page: Page) -> Locator:
         """Retorna o resultado final do desafio."""
-        return page.get_by_text("Your success rate")
+        return page.get_by_text('Your success rate')

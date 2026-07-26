@@ -25,9 +25,9 @@ def ler_dados(logs: Logs) -> pd.DataFrame:
     Returns:
         DataFrame com os dados tratados e prontos para uso.
     """
-    logs.info("Lendo arquivo de entrada.")
+    logs.info('Lendo arquivo de entrada.')
     dados = LerArquivo(logs).ler_arquivo()
-    logs.info(f"{len(dados)} registros carregados com sucesso.")
+    logs.info(f'{len(dados)} registros carregados com sucesso.')
     return dados
 
 
@@ -56,7 +56,7 @@ def executar_challenge(
         tuple[int, int]: (processados_com_sucesso, processados_com_falha)
     """
     total = len(items)
-    logs.info("Iniciando desafio.")
+    logs.info('Iniciando desafio.')
     challenge = Challenge(page, logs)
     challenge.iniciar_desafio(url)
 
@@ -65,7 +65,7 @@ def executar_challenge(
 
     for i, item_info in enumerate(items, 1):
         item_id = item_info.item_run.item_id  # type: ignore[union-attr]
-        logs.info(f"Preenchendo formulário {i}/{total}.")
+        logs.info(f'Preenchendo formulário {i}/{total}.')
 
         db.update_item_run_status(item_id, ItemRunStatus.PROCESSING)
         try:
@@ -83,9 +83,9 @@ def executar_challenge(
             failed += 1
             raise
 
-    logs.info("Aguardando resultado final.")
+    logs.info('Aguardando resultado final.')
     resultado = challenge.capturar_resultado()
     if resultado:
         db.update_items_result(item_ids, resultado)
-    logs.info("Execução concluída com sucesso.")
+    logs.info('Execução concluída com sucesso.')
     return processed, failed

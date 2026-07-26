@@ -22,13 +22,14 @@ class LerArquivo:
 
     def obter_arquivos_xlsx(self) -> list[Path]:
         """
-        Retorna todos os arquivos .xlsx de PATH_IN ordenados do mais antigo para o mais recente.
+        Retorna os arquivos .xlsx de PATH_IN, do mais antigo para o mais recente.
 
         Returns:
             Lista de Paths dos arquivos .xlsx encontrados.
 
         Raises:
-            FileNotFoundError: Se a pasta PATH_IN não existir ou não houver arquivos .xlsx.
+            FileNotFoundError: Se a pasta PATH_IN não existir ou não houver
+                arquivos .xlsx nela.
         """
         if not self.path_in.exists():
             raise FileNotFoundError(f'Pasta PATH_IN não encontrada: {self.path_in}')
@@ -52,7 +53,8 @@ class LerArquivo:
 
     def ler_arquivo(self) -> pd.DataFrame:
         """
-        Lê todos os arquivos .xlsx de PATH_IN, aplica tratamentos e retorna um DataFrame consolidado.
+        Lê os arquivos .xlsx de PATH_IN, aplica tratamentos e retorna um
+        DataFrame consolidado.
 
         Tratamentos aplicados:
             - Strip nos nomes das colunas (remove espaços extras)
@@ -67,7 +69,7 @@ class LerArquivo:
             self.logs.info(f'Lendo arquivo: {arquivo.name}.')
             df = pd.read_excel(arquivo)
 
-            # Remove espaços extras nos nomes das colunas — evita KeyError por espaços ocultos
+            # Strip nos nomes das colunas — evita KeyError por espaço oculto
             df.columns = df.columns.str.strip()
 
             # Remove colunas e linhas completamente vazias

@@ -4,8 +4,6 @@
 3 - Utiliza os localizadores definidos em locators.py.
 """
 
-import time
-
 from playwright.sync_api import Page
 
 from resources.Modules.locators import LocatorChallenge
@@ -49,10 +47,10 @@ class Challenge:
         Args:
             url: URL do sistema a ser acessado, proveniente das configurações.
         """
-        self.logs.info("Navegando para a URL do RPA Challenge.")
+        self.logs.info('Navegando para a URL do RPA Challenge.')
         self.page.goto(url)
         self.btn_start.click()
-        self.logs.info("Desafio iniciado com sucesso.")
+        self.logs.info('Desafio iniciado com sucesso.')
 
     def preencher_formulario(self, item: Item) -> None:
         """
@@ -75,15 +73,17 @@ class Challenge:
         # Envia o formulário após preencher todos os campos
         self.btn_submit.click()
 
-    def capturar_resultado(self):
+    def capturar_resultado(self) -> str | None:
         """
-        Aguarda após o envio do último formulário para que o resultado
-        final do desafio seja exibido e capturado antes de fechar o navegador.
+        Lê o texto do resultado final exibido após o envio do último formulário.
 
-        Args:
-            segundos: Tempo de espera em segundos. Padrão: 5.
+        A leitura é imediata, sem espera explícita: se o site ainda não tiver
+        renderizado o resultado, o retorno pode ser None.
+
+        Returns:
+            str | None: Texto do resultado, ou None se o elemento estiver vazio.
         """
         resultado = self.resultado_final.text_content()
         self.logs.info(resultado)
-        
+
         return resultado

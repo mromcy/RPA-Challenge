@@ -44,7 +44,7 @@ class Execute:
         self.maestro = BotMaestroSDK.from_sys_args()
 
         if not self.maestro.task_id:
-            print("Executando em modo local (sem task_id).")
+            print('Executando em modo local (sem task_id).')
             self.execution = None
         else:
             self.execution = self.maestro.get_execution()
@@ -56,7 +56,9 @@ class Execute:
         # Cria o registro inicial no banco; a partir daqui, run_id identifica
         # esta execução em todas as tabelas relacionadas
         self.run_id = AddProcessRun().execute()
-        self.logs.info(f'Execução registrada no banco com run_id={self.run_id} (SCHEDULED)')
+        self.logs.info(
+            f'Execução registrada no banco com run_id={self.run_id} (SCHEDULED)'
+        )
 
     def execute(self) -> None:
         """
@@ -104,7 +106,10 @@ class Execute:
                 self.maestro.finish_task(
                     task_id=str(self.maestro.task_id),
                     status=AutomationTaskFinishStatus.SUCCESS,
-                    message=(f'Execução concluída com sucesso. Processados: {processed} - Falhados: {failed} - Total de itens: {total}'),
+                    message=(
+                        f'Execução concluída com sucesso. Processados: {processed} '
+                        f'- Falhados: {failed} - Total de itens: {total}'
+                    ),
                     total_items=total,
                     processed_items=processed,
                     failed_items=failed,

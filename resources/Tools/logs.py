@@ -10,12 +10,14 @@ from resources.settings import Settings
 
 class Logs:
     """
-    Classe de logger que combina saída em console e em arquivo,
-    com persistência em banco de dados.
+    Logger que escreve em console e em arquivo, e encaminha erros ao BotCity
+    Maestro quando a execução tem task_id.
+
+    O gancho de persistência em banco (_save_log_to_db) ainda é um stub sem efeito.
 
     Parâmetros:
-        log_file (str): Caminho do arquivo de log
-            (default: 'app.log').
+        maestro (BotMaestroSDK): SDK usado para reportar erros ao Maestro
+            quando a execução não é local.
         logger_name (str): Nome do logger configurado
             (default: 'RPA').
         log_level (int): Nível mínimo de captura de logs
@@ -31,9 +33,12 @@ class Logs:
         logger_name: str = 'RPA',
         log_level: int = logging.INFO,
         configure_handler: bool = True,
-        logger: logging.Logger = None,
+        logger: logging.Logger | None = None,
     ):
-        self.log_dir = Settings().PATH_LOGS
+        self.maestro = maestro
+        self._local_execution = not maestro.task_id
+
+        self.log_dir = Settings().PATH_LOGS # type: ignore
 
         os.makedirs(self.log_dir, exist_ok=True)
 
@@ -62,9 +67,6 @@ class Logs:
             file_handler = logging.FileHandler(log_path, encoding='utf-8')
             file_handler.setFormatter(formatter)
             self._logger.addHandler(file_handler)
-
-            self.maestro = maestro
-            self._local_execution = not maestro.task_id
 
             if logger is None:
                 self._logger.propagate = False
@@ -97,7 +99,7 @@ class Logs:
     def _save_log_to_botcity(self, exception):
         if self._local_execution:
             return
-        if not isinstance(exception, BaseException):
+        if not isinstance(exception, Exception):
             return
         self.maestro.error(task_id=self.maestro.task_id, exception=exception)
 

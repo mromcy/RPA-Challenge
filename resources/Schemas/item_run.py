@@ -106,7 +106,8 @@ class Item(BaseModel):
     Email: str
     Phone_Number: str
     result: Optional[str] = None
-    
+
+
 class ItemInfo(BaseModel):
     """
     Agrupa as informações de um item e sua execução.

@@ -35,7 +35,7 @@ def create_items(dados: pd.DataFrame, run_id: int) -> list[int]:
 
     with get_session() as session:
         for _, row in dados.iterrows():
-            item_key = f"{row['First Name']}_{row['Phone Number']}"
+            item_key = f'{row["First Name"]}_{row["Phone Number"]}'
 
             item_run: Any = ORMItemRun(
                 run_id=run_id,

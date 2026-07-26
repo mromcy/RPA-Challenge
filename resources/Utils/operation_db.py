@@ -11,11 +11,11 @@ para rastrear o ciclo de vida de uma execução de processo:
 Transições de status suportadas:
     SCHEDULED → RUNNING   : preenche started_at e stage_started_at
     RUNNING   → COMPLETED : preenche ended_at e calcula total_work_time
-    RUNNING   → FAILED    : preenche ended_at, total_work_time, error_message e error_stack
+    RUNNING   → FAILED    : preenche ended_at, total_work_time, error_message
+                            e error_stack
     qualquer  → CANCELED  : preenche ended_at e total_work_time
 """
 
-import traceback
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -24,7 +24,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 
 from resources.database import get_session
-from resources.models import ItemRunStatus, ORMItem, ORMItemRun, ORMProcessRun, ProcessRunStatus
+from resources.models import (
+    ItemRunStatus,
+    ORMItem,
+    ORMItemRun,
+    ORMProcessRun,
+    ProcessRunStatus,
+)
 from resources.Schemas.item_run import Item, ItemInfo, ItemRun
 from resources.Schemas.process_run import ProcessRun
 
@@ -132,7 +138,7 @@ class OperationDb:
 
             match status:
                 case ProcessRunStatus.RUNNING:
-                    # Preserva o started_at original caso o processo já tenha sido iniciado
+                    # Preserva o started_at original se o processo já foi iniciado
                     if pr.started_at is None:
                         pr.started_at = now
                     pr.stage_started_at = now

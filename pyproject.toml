@@ -1,24 +1,30 @@
-[tool.poetry]
-name = "RPA_Challenge"
+[project]
+name = "rpa-challenge"
 version = "0.1.0"
-package-mode = false
-description = ""
-authors = ["Marco Romcy <marcoromcy@gmail.com>"]
+description = "Production-style RPA bot that solves rpachallenge.com, with queue-based item state tracking in PostgreSQL, Alembic migrations and Fernet-encrypted credentials."
+authors = [{ name = "Marco Romcy", email = "marcoromcy@gmail.com" }]
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
-packages = [{include = "resources"}]
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "alembic>=1.17.0,<2.0.0",
+    "botcity-maestro-sdk>=0.9.0,<0.10.0",
+    "cryptography>=46.0.2,<47.0.0",
+    "openpyxl>=3.1.5,<4.0.0",
+    "pandas>=3.0.1,<4.0.0",
+    "playwright>=1.58.0,<2.0.0",
+    "psycopg[binary]==3.2.9",
+    "pydantic>=2.13.4,<3.0.0",
+    "pydantic-settings>=2.11.0,<3.0.0",
+    "pytz>=2025.2,<2026.0",
+    "sqlalchemy>=2.0.51,<3.0.0",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.11,<3.14"
-alembic = "^1.17.0"
-cryptography = "^46.0.2"
-botcity-maestro-sdk = "^0.9.0"
-pydantic-settings = "^2.11.0"
-psycopg = {version = "3.2.9", extras = ["binary"]}
-pytz = "^2025.2"
-playwright = "^1.58.0"
-pandas = "^3.0.1"
-openpyxl = "^3.1.5"
-
+# Poetry-specific behaviour, not standard metadata: this is an application, never a
+# published package, so Poetry manages the virtualenv without building the project.
+[tool.poetry]
+package-mode = false
 
 [tool.ruff]
 line-length = 90
@@ -37,11 +43,12 @@ pythonpath = "."
 addopts = '-p no:warnings'
 
 [tool.taskipy.tasks]
-lint = 'ruff check .&& ruff check . --diff'
-format = 'ruff check . --fix&& ruff format .'
-run = ' python bot.py'
+lint = 'ruff check .'
+format = 'ruff check . --fix --exit-zero && ruff format .'
+run = 'python bot.py'
+export = 'poetry export -f requirements.txt --output requirements.txt --without-hashes'
 pre_test = 'task lint'
-test = 'pytest --cov=validacao_produtos_valores -vv'
+test = 'pytest --cov=resources -vv'
 post_test = 'coverage html'
 
 [build-system]
