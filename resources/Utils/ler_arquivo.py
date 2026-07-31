@@ -2,23 +2,59 @@
 1 - Módulo responsável pela leitura e tratamento do arquivo de entrada.
 2 - Localiza arquivos .xlsx em PATH_IN e retorna um DataFrame limpo.
 3 - Centraliza os tratamentos de leitura para evitar erros nos módulos de execução.
+
+A leitura (que depende do disco) fica na classe; a limpeza é a função pura
+limpar_dataframe, isolada para poder ser testada e reaproveitada sem I/O.
 """
 
 from pathlib import Path
 
 import pandas as pd
 
-from resources.settings import Settings
+from resources.settings import get_settings
 from resources.Tools.logs import Logs
+
+
+def limpar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Devolve uma versão tratada do DataFrame, sem alterar o original.
+
+    Tratamentos aplicados:
+        - Strip nos nomes das colunas (evita KeyError por espaço oculto)
+        - Remoção de colunas inteiramente vazias
+        - Remoção de linhas inteiramente vazias
+
+    Usa set_axis em vez de atribuir a df.columns: a atribuição mutaria o
+    DataFrame recebido, o que faria a função deixar de ser pura.
+
+    Args:
+        df: DataFrame como veio do arquivo, sem tratamento.
+
+    Returns:
+        DataFrame tratado. O original permanece intacto.
+    """
+    return (
+        df.set_axis(df.columns.str.strip(), axis=1)
+        .dropna(axis=1, how='all')
+        .dropna(axis=0, how='all')
+    )
 
 
 class LerArquivo:
     """Leitura e tratamento de arquivos .xlsx localizados em PATH_IN."""
 
-    def __init__(self, logs: Logs):
-        """Inicializa com o caminho de entrada definido nas configurações."""
+    def __init__(self, logs: Logs, path_in: str | Path | None = None):
+        """
+        Inicializa com a pasta de entrada.
+
+        Args:
+            logs: Instância de Logs para registro das operações.
+            path_in: Pasta onde procurar os .xlsx. Omitida, cai em
+                get_settings().PATH_IN — e só nesse caso o config.json é lido,
+                o que permite testar com uma pasta temporária.
+        """
         self.logs = logs
-        self.path_in = Path(Settings().PATH_IN)  # pyright: ignore[reportCallIssue]
+        self.path_in = Path(path_in or get_settings().PATH_IN)
 
     def obter_arquivos_xlsx(self) -> list[Path]:
         """
@@ -56,10 +92,7 @@ class LerArquivo:
         Lê os arquivos .xlsx de PATH_IN, aplica tratamentos e retorna um
         DataFrame consolidado.
 
-        Tratamentos aplicados:
-            - Strip nos nomes das colunas (remove espaços extras)
-            - Remoção de colunas inteiramente vazias
-            - Remoção de linhas inteiramente vazias
+        Os tratamentos ficam em limpar_dataframe.
 
         Returns:
             DataFrame pandas com os dados tratados e prontos para uso.
@@ -67,15 +100,6 @@ class LerArquivo:
         dataframes = []
         for arquivo in self.obter_arquivos_xlsx():
             self.logs.info(f'Lendo arquivo: {arquivo.name}.')
-            df = pd.read_excel(arquivo)
-
-            # Strip nos nomes das colunas — evita KeyError por espaço oculto
-            df.columns = df.columns.str.strip()
-
-            # Remove colunas e linhas completamente vazias
-            df = df.dropna(axis=1, how='all')
-            df = df.dropna(axis=0, how='all')
-
-            dataframes.append(df)
+            dataframes.append(limpar_dataframe(pd.read_excel(arquivo)))
 
         return pd.concat(dataframes, ignore_index=True)

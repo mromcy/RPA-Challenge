@@ -3,6 +3,7 @@ Configurações do projeto e gerenciamento de credenciais criptografadas.
 
 Este módulo expõe:
 - Settings: carrega e valida os campos do config.json via Pydantic.
+- get_settings(): fábrica com cache — ponto único de acesso às configurações.
 - Cryptography: lê e descriptografa credenciais armazenadas em secret/.
 """
 
@@ -10,11 +11,16 @@ from __future__ import annotations
 
 import json
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from cryptography.fernet import Fernet
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Raiz do repositório: settings.py mora em resources/, então dois níveis acima.
+# Serve de âncora tanto para localizar o config.json quanto para os caminhos padrão.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
@@ -29,10 +35,14 @@ class Settings(BaseSettings):
     LOGIN_BOTCITY: str
     KEY_BOTCITY: str
 
-    PATH_BASE: str
     PATH_URL: str
-    PATH_IN: str
-    PATH_OUT: str
+
+    # Caminhos com padrão derivado da raiz do repositório: um clone roda sem
+    # configurar caminho nenhum. Continuam aceitos no config.json e o valor de lá
+    # vence — em produção, PATH_IN e PATH_OUT costumam ser pastas de rede.
+    PATH_BASE: str = str(_REPO_ROOT)
+    PATH_IN: str = str(_REPO_ROOT / 'Entrada')
+    PATH_OUT: str = str(_REPO_ROOT / 'Saida')
 
     # Conexão com o banco de dados PostgreSQL
     HOST_DB_POSTGRES: str
@@ -91,7 +101,7 @@ class Settings(BaseSettings):
             # O config.json fica na raiz do repositório e NUNCA deve ser commitado:
             # ele contém credenciais reais. O .gitignore já o bloqueia — use o
             # config.example.json (esse sim versionado) como modelo.
-            json_path = Path(__file__).resolve().parents[1] / 'config.json'
+            json_path = _REPO_ROOT / 'config.json'
 
             if not json_path.exists():
                 raise FileNotFoundError(
@@ -108,6 +118,26 @@ class Settings(BaseSettings):
             file_secret_settings,
             init_settings,
         )
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """
+    Retorna a instância única de Settings, lendo o config.json uma só vez.
+
+    Todo o projeto deve obter as configurações por aqui, e não instanciando
+    Settings() diretamente. Isso evita reler o arquivo a cada chamada e
+    concentra num único ponto a supressão de tipo abaixo: os campos são
+    obrigatórios na classe, mas chegam do JSON em tempo de execução — o
+    type checker não enxerga essa fonte e acusa argumentos faltando.
+
+    O cache pode ser descartado com ``get_settings.cache_clear()``, recurso
+    usado pelos testes para trocar o config.json por um de fixture.
+
+    Returns:
+        Settings: Configurações validadas do projeto.
+    """
+    return Settings()  # type: ignore[call-arg]
 
 
 class Cryptography:
@@ -129,13 +159,17 @@ class Cryptography:
         usuario, senha = Cryptography().ler_credenciais('db_credentials')
     """
 
-    def __init__(self):
+    def __init__(self, path_secrets: str | Path | None = None):
         """
         Inicializa com o caminho base da pasta secret/.
 
-        O caminho é resolvido a partir do config.json para ser portável entre máquinas.
+        Args:
+            path_secrets: Pasta que contém as subpastas de credenciais. Omitido,
+                cai em get_settings().PATH_SECRETS — e **só nesse caso** o
+                config.json é lido, o que permite testar em uma pasta temporária
+                sem configuração real nem acesso ao secret/ da máquina.
         """
-        self._path_secrets = Settings().PATH_SECRETS  # type: ignore[call-arg]
+        self._path_secrets = path_secrets or get_settings().PATH_SECRETS
 
     def __pegar_chave(self, credentials: str) -> bytes:
         """
@@ -148,16 +182,14 @@ class Cryptography:
             bytes: Chave de cifragem em formato binário.
 
         Raises:
-            Exception: Se o arquivo secret.key não for encontrado.
+            FileNotFoundError: Se o arquivo secret.key não for encontrado.
         """
+        key_path = os.path.join(self._path_secrets, credentials, 'secret.key')
         try:
-            key_path = os.path.join(self._path_secrets, credentials, 'secret.key')
-            return open(key_path, 'rb').read()
-        except IOError:
-            raise Exception(
-                f'Chave não encontrada em: '
-                f'{self._path_secrets}\\{credentials}\\secret.key'
-            )
+            with open(key_path, 'rb') as f:
+                return f.read()
+        except FileNotFoundError:
+            raise FileNotFoundError(f'Chave não encontrada em: {key_path}')
 
     @staticmethod
     def __descriptografar(valor_criptografado: str, key: bytes) -> str:

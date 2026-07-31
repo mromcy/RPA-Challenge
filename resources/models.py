@@ -24,7 +24,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
 
 from resources.database import engine
-from resources.settings import Settings
+from resources.settings import get_settings
 
 external_md = MetaData(schema='process_manager')
 table_registry = registry()
@@ -76,7 +76,7 @@ class ORMProcessRun:
     __table__ = process_run_tbl
 
 
-schema_name = Settings().DB_SCHEMA  # type: ignore[call-arg]
+schema_name = get_settings().DB_SCHEMA
 
 
 class ProcessRunStatus(str, enum.Enum):

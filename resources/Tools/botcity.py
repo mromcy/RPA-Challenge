@@ -1,8 +1,8 @@
 from botcity.maestro import BotMaestroSDK
 
-from resources.settings import Settings
+from resources.settings import get_settings
 
-settings = Settings()  # type: ignore[call-arg]
+settings = get_settings()
 
 
 def login() -> BotMaestroSDK:

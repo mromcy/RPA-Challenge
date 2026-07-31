@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 from resources.database import get_session
 from resources.models import ORMProcessRun, ProcessRunStatus
-from resources.settings import Settings
+from resources.settings import get_settings
 
 _TZ = ZoneInfo('America/Fortaleza')
 
@@ -54,7 +54,7 @@ class AddProcessRun:
         Returns:
             int: run_id gerado pelo banco de dados.
         """
-        settings = Settings()  # type: ignore[call-arg]
+        settings = get_settings()
 
         now = datetime.now(_TZ)
 

@@ -5,14 +5,14 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from resources.settings import Settings
+from resources.settings import get_settings
 
 from resources.models import table_registry
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option('sqlalchemy.url',Settings().DATABASE_URL)  # type: ignore[call-arg]
+config.set_main_option('sqlalchemy.url',get_settings().DATABASE_URL)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -69,7 +69,7 @@ def run_migrations_offline() -> None:
         
 def include_object(object, name, type_, reflected, compare_to):
     if type_ == 'table':
-        if object.schema != Settings().DB_SCHEMA:  # type: ignore[call-arg]
+        if object.schema != get_settings().DB_SCHEMA:
             return False
     return True         
 
@@ -87,14 +87,14 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    create_schemas_if_not_exists(connectable, Settings().DB_SCHEMA)  # type: ignore[call-arg]
+    create_schemas_if_not_exists(connectable, get_settings().DB_SCHEMA)
     
     with connectable.connect() as connection:
         context.configure(
             connection=connection, 
             target_metadata=target_metadata,
             include_schemas= True,
-            version_table_schema= Settings().DB_SCHEMA,  # type: ignore[call-arg]
+            version_table_schema= get_settings().DB_SCHEMA,
             include_object=include_object
         )
 

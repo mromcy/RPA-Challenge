@@ -5,7 +5,7 @@ from datetime import datetime
 
 from botcity.maestro import BotMaestroSDK
 
-from resources.settings import Settings
+from resources.settings import get_settings
 
 
 class Logs:
@@ -38,7 +38,7 @@ class Logs:
         self.maestro = maestro
         self._local_execution = not maestro.task_id
 
-        self.log_dir = Settings().PATH_LOGS # type: ignore
+        self.log_dir = get_settings().PATH_LOGS
 
         os.makedirs(self.log_dir, exist_ok=True)
 

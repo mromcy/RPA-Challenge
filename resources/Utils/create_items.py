@@ -12,7 +12,7 @@ import pandas as pd
 
 from resources.database import get_session
 from resources.models import ItemRunStatus, ORMItem, ORMItemRun
-from resources.settings import Settings
+from resources.settings import get_settings
 
 
 def create_items(dados: pd.DataFrame, run_id: int) -> list[int]:
@@ -30,7 +30,7 @@ def create_items(dados: pd.DataFrame, run_id: int) -> list[int]:
     Returns:
         list[int]: Lista de item_ids criados.
     """
-    settings = Settings()  # type: ignore[call-arg]
+    settings = get_settings()
     item_ids: list[int] = []
 
     with get_session() as session:

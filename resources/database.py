@@ -11,12 +11,12 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from resources.settings import Settings
+from resources.settings import get_settings
 
 # Engine compartilhado por todo o projeto.
 # pool_pre_ping=True evita erros silenciosos com conexões stale após idle longo.
 engine = create_engine(
-    Settings().DATABASE_URL,  # type: ignore[call-arg]
+    get_settings().DATABASE_URL,
     connect_args={
         'connect_timeout': 10,
         # Força o timezone do servidor para America/Fortaleza em todas as sessões

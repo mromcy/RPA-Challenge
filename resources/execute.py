@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 
 from resources.Executers.execute_challenge import executar_challenge, ler_dados
 from resources.models import ProcessRunStatus
-from resources.settings import Settings
+from resources.settings import get_settings
 from resources.Tools.add_process_run import AddProcessRun
 from resources.Tools.botcity import login  # noqa
 from resources.Tools.logs import Logs
@@ -50,7 +50,7 @@ class Execute:
             self.execution = self.maestro.get_execution()
 
         self.logs = Logs(self.maestro)
-        self.settings = Settings()  # type: ignore[call-arg]
+        self.settings = get_settings()
         self.db = OperationDb()
 
         # Cria o registro inicial no banco; a partir daqui, run_id identifica
