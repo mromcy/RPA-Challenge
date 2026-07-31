@@ -20,6 +20,7 @@ env/
 .coverage.*
 htmlcov/
 .pytest_cache/
+.ruff_cache/
 
 # =============================================================================
 # Credenciais — NUNCA commitar
@@ -59,6 +60,7 @@ Saida/*
 # =============================================================================
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 
@@ -78,4 +80,6 @@ desktop.ini
 # =============================================================================
 # Documentos internos — não fazem parte do projeto público
 # =============================================================================
-PORTFOLIO_BRIEF.md
+# Cobre PORTFOLIO_BRIEF.md (a especificação) e PORTFOLIO_PROGRESS.md (o
+# acompanhamento), além de qualquer companheiro futuro dessa família.
+PORTFOLIO_*.md
