@@ -44,6 +44,27 @@ class Settings(BaseSettings):
     PATH_IN: str = str(_REPO_ROOT / 'Entrada')
     PATH_OUT: str = str(_REPO_ROOT / 'Saida')
 
+    DRIVER: str = 'playwright'
+    """Driver usado quando a linha de comando não especifica outro."""
+
+    PATH_BROWSER: str = ''
+    """
+    Executável do navegador, honrado pelos dois drivers.
+
+    Vazio significa deixar cada biblioteca usar o navegador que ela gerencia —
+    o Playwright, o Chromium próprio; o Selenium, o Chrome do sistema. O
+    benchmark exige este campo preenchido, porque comparar bibliotecas dirigindo
+    navegadores diferentes mede navegador, não biblioteca.
+    """
+
+    PATH_SELENIUM_DRIVER: str = ''
+    """
+    Executável do chromedriver. Só o Selenium usa.
+
+    Vazio deixa o Selenium Manager baixar a versão correspondente ao navegador.
+    Só precisa ser preenchido em máquina sem saída para a internet.
+    """
+
     # Conexão com o banco de dados PostgreSQL
     HOST_DB_POSTGRES: str
     PORT_DB_POSTGRES: int

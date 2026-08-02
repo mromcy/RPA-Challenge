@@ -13,7 +13,7 @@ import traceback
 
 from botcity.maestro import AutomationTaskFinishStatus, BotMaestroSDK
 
-from resources.Drivers.playwright_driver import PlaywrightDriver
+from resources.Drivers.factory import criar_driver
 from resources.Executers.execute_challenge import executar_challenge, ler_dados
 from resources.models import ProcessRunStatus
 from resources.settings import get_settings
@@ -39,7 +39,12 @@ class Execute:
         run_id: Identificador único desta execução, gerado no banco ao iniciar.
     """
 
-    def __init__(self):
+    def __init__(self, driver: str | None = None):
+        """
+        Args:
+            driver: 'playwright' ou 'selenium'. Omitido, usa Settings.DRIVER.
+        """
+        self.driver_escolhido = driver
         self.maestro = BotMaestroSDK()
         self.maestro = BotMaestroSDK.from_sys_args()
 
@@ -92,7 +97,8 @@ class Execute:
             self.logs.info(f'{total} itens carregados do banco para processamento.')
 
             # Janela visível: o operador acompanha o robô preenchendo o formulário.
-            driver = PlaywrightDriver(headless=False)
+            driver = criar_driver(self.driver_escolhido, headless=False)
+            self.logs.info(f'Driver selecionado: {driver.nome}.')
             try:
                 processed, failed = executar_challenge(
                     driver, self.logs, items, self.settings.PATH_URL, self.db
