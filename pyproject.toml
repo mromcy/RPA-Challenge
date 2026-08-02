@@ -42,6 +42,11 @@ quote-style = 'single'
 [tool.pytest.ini_options]
 pythonpath = "."
 addopts = '-p no:warnings'
+# Registrar o marker faz o pytest recusar etiqueta desconhecida: sem isso, um
+# @pytest.mark.e2ee com erro de digitação criaria um teste que nunca roda.
+markers = [
+    "e2e: fluxo completo contra o rpachallenge.com ao vivo; exige rede e navegador",
+]
 
 [tool.taskipy.tasks]
 lint = 'ruff check .'
@@ -49,8 +54,11 @@ format = 'ruff check . --fix --exit-zero && ruff format .'
 run = 'python bot.py'
 export = 'poetry export -f requirements.txt --output requirements.txt --without-hashes'
 pre_test = 'task lint'
-test = 'pytest --cov=resources -vv'
+# A pista rápida exclui e2e: sem rede, sem navegador, roda a cada alteração.
+test = 'pytest -m "not e2e" --cov=resources -vv'
 post_test = 'coverage html'
+# A pista lenta, sob demanda: sobe navegador e depende do site estar no ar.
+e2e = 'pytest -m e2e -vv'
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
