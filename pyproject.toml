@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.11.0,<3.0.0",
     "pytz>=2025.2,<2026.0",
     "sqlalchemy>=2.0.51,<3.0.0",
+    "selenium (>=4.46.0,<5.0.0)",
 ]
 
 # Poetry-specific behaviour, not standard metadata: this is an application, never a
