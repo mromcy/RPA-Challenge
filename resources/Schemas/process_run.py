@@ -26,7 +26,7 @@ class ProcessRun(BaseModel):
         stage_started_at (datetime, opcional): Início da última etapa.
         started_at (datetime, opcional): Data/hora de início.
         ended_at (datetime, opcional): Data/hora de término.
-        total_work_time (datetime, opcional): Tempo total de execução.
+        total_work_time (timedelta, opcional): Tempo total de execução.
         error_message (str, opcional): Mensagem de erro, se houver.
         error_stack (str, opcional): Stacktrace do erro, se aplicável.
         metadata_ (dict, opcional): Metadados adicionais da execução.

@@ -2,8 +2,8 @@
 Definições de esquemas Pydantic para itens e execuções.
 
 Este módulo contém modelos de dados que representam informações de itens
-e suas execuções em processos de compensação. São usados para trafegar
-informações entre banco de dados, automações e APIs.
+e suas execuções. São usados para trafegar informações entre banco de dados,
+automações e APIs.
 """
 
 from datetime import datetime, timedelta
@@ -35,7 +35,7 @@ class ItemRun(BaseModel):
         last_updated_at (Optional[datetime]): Data da última atualização.
         next_review_at (Optional[datetime]): Data da próxima revisão.
         completed_at (Optional[datetime]): Data de conclusão.
-        total_work_time (Optional[datetime]): Tempo total de execução.
+        total_work_time (Optional[timedelta]): Tempo total de execução.
         exception_at (Optional[datetime]): Data em que houve exceção.
         exception_reason (Optional[str]): Motivo da exceção.
     """
@@ -65,33 +65,27 @@ class ItemRun(BaseModel):
 
 class Item(BaseModel):
     """
-    Representa os dados de um item a ser processado na compensação.
+    Dados de um registro do formulário do RPA Challenge.
+
+    Cada instância corresponde a uma linha do arquivo de entrada e a uma rodada
+    do desafio. Os sete campos espelham os rótulos exibidos na página; o mapa
+    de rótulo para atributo vive em Modules/challenge.py, em
+    CAMPOS_DO_FORMULARIO.
 
     Atributos:
-        id (int): Identificador do item.
-        dt_deposito (date): Data do depósito associado.
-        terceirizada (str): Nome da terceirizada responsável.
-        sheet_name (str): Nome da planilha de origem.
-        cnpj_terceirizada (str): CNPJ da terceirizada.
-        carteira (str): Carteira do item.
-        codigo (str): Código identificador.
-        doc_adiantamento (str): Documento de adiantamento.
-        n_transacao_sequencia (str): Número da transação/sequência.
-        doc_nota_fiscal (str): Documento da nota fiscal.
-        dt_vencimento (date): Data de vencimento.
-        razao_social_cliente (str): Nome/Razão social do cliente.
-        cnpj_cliente (str): CNPJ do cliente.
-        tipo_pessoa (str): Tipo de pessoa (Física/Jurídica).
-        vl_integral (float): Valor integral.
-        juros (str): Percentual ou indicador de juros.
-        vl_juros (float): Valor de juros.
-        vl_total_repasse_por_documento (float): Valor total do repasse.
-        honorario_devedor (float): Honorário do devedor.
-        saldo (float): Saldo em aberto.
-        n_banco (str): Número do banco.
-        comentario (str): Observações adicionais.
-        doc_compensacao (Optional[str]): Documento de compensação.
-        mensagem (Optional[str]): Mensagem de retorno do SAP.
+        id (int): Chave primária do registro na tabela item.
+        item_id (int): Chave estrangeira para item_run.item_id, que liga este
+            registro à sua execução na fila.
+        First_Name (str): Campo 'First Name' do formulário.
+        Last_Name (str): Campo 'Last Name'.
+        Company_Name (str): Campo 'Company Name'.
+        Role_in_Company (str): Campo 'Role in Company'.
+        Address (str): Campo 'Address'.
+        Email (str): Campo 'Email'.
+        Phone_Number (str): Campo 'Phone Number'.
+        result (Optional[str]): Mensagem final do desafio, gravada após o
+            último envio — ex.: 'Your success rate is 100% (70 out of 70
+            fields) in 678 milliseconds'.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -110,11 +104,15 @@ class Item(BaseModel):
 
 class ItemInfo(BaseModel):
     """
-    Agrupa as informações de um item e sua execução.
+    Agrupa um item, sua execução na fila e o processo que a originou.
+
+    É o formato devolvido por OperationDb.get_queued_items_by_run, que junta as
+    três tabelas numa consulta só.
 
     Atributos:
-        item (Item): Dados do item de compensação.
-        item_run (ItemRun): Dados da execução associada ao item.
+        process_run (ProcessRun): Execução do processo à qual o item pertence.
+        item (Optional[Item]): Dados do formulário.
+        item_run (Optional[ItemRun]): Estado do item na fila.
     """
 
     process_run: ProcessRun
