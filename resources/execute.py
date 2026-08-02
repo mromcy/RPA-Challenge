@@ -12,8 +12,8 @@ Responsabilidades:
 import traceback
 
 from botcity.maestro import AutomationTaskFinishStatus, BotMaestroSDK
-from playwright.sync_api import sync_playwright
 
+from resources.Drivers.playwright_driver import PlaywrightDriver
 from resources.Executers.execute_challenge import executar_challenge, ler_dados
 from resources.models import ProcessRunStatus
 from resources.settings import get_settings
@@ -91,13 +91,22 @@ class Execute:
             total = len(items)
             self.logs.info(f'{total} itens carregados do banco para processamento.')
 
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=False, args=['--start-maximized'])
-                page = browser.new_page(no_viewport=True)
+            # Janela visível: o operador acompanha o robô preenchendo o formulário.
+            driver = PlaywrightDriver(headless=False)
+            try:
                 processed, failed = executar_challenge(
-                    page, self.logs, items, self.settings.PATH_URL, self.db
+                    driver, self.logs, items, self.settings.PATH_URL, self.db
                 )
-                browser.close()
+            finally:
+                # Falha ao fechar vira aviso: mascarar o erro original com um
+                # problema de limpeza faria o diagnóstico apontar para o lugar
+                # errado.
+                try:
+                    driver.fechar()
+                except Exception as erro_de_limpeza:
+                    self.logs.warning(
+                        f'Falha ao fechar o navegador: {erro_de_limpeza}'
+                    )
 
             self.db.update_process_run_status(self.run_id, ProcessRunStatus.COMPLETED)
             self.logs.info(f'run_id={self.run_id} → COMPLETED')

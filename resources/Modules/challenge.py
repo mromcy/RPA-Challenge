@@ -1,89 +1,85 @@
 """
-1 - Classe com as funcionalidades do sistema que será automatizado.
-2 - Responsável pelas interações com a página do RPA Challenge.
-3 - Utiliza os localizadores definidos em locators.py.
+1 - Fluxo de negócio do RPA Challenge.
+2 - Fala com o navegador exclusivamente pelo contrato BrowserDriver.
+3 - Não importa Playwright nem Selenium: qual biblioteca dirige a tela é
+    decisão de quem monta o driver, e este módulo não precisa saber.
 """
 
-from playwright.sync_api import Page
-
-from resources.Modules.locators import LocatorChallenge
+from resources.Drivers.base import BrowserDriver
 from resources.Schemas.item_run import Item
 from resources.Tools.logs import Logs
 
+CAMPOS_DO_FORMULARIO = {
+    'First Name': 'First_Name',
+    'Last Name': 'Last_Name',
+    'Company Name': 'Company_Name',
+    'Role in Company': 'Role_in_Company',
+    'Address': 'Address',
+    'Email': 'Email',
+    'Phone Number': 'Phone_Number',
+}
+"""
+Rótulo exibido na tela → atributo correspondente em Item.
+
+Mapa de dados, e não sete chamadas escritas à mão: acrescentar um campo ao
+formulário passa a ser uma linha aqui, sem tocar em nenhum driver. Os rótulos
+são os que o desafio realmente exibe, e é por eles que os campos são
+localizados — o site embaralha a ordem a cada rodada.
+"""
+
 
 class Challenge:
-    """Classe responsável pelas interações com a página do RPA Challenge."""
+    """Executa o fluxo do RPA Challenge sobre qualquer BrowserDriver."""
 
-    def __init__(self, page: Page, logs: Logs) -> None:
+    def __init__(self, driver: BrowserDriver, logs: Logs) -> None:
         """
-        Inicializa a classe com a página do Playwright e resolve os localizadores.
-
         Args:
-            page: Instância da página do Playwright já criada pelo browser.
+            driver: Implementação de BrowserDriver já construída.
             logs: Instância de Logs para registro das operações.
         """
-        self.page = page
+        self.driver = driver
         self.logs = logs
-        loc = LocatorChallenge
-
-        # Resolve cada localizador uma única vez para reutilização nos métodos
-        self.btn_start = loc.btn_start(page)
-        self.btn_submit = loc.btn_submit(page)
-        self.input_first_name = loc.input_first_name(page)
-        self.input_last_name = loc.input_last_name(page)
-        self.input_company_name = loc.input_company_name(page)
-        self.input_role_in_company = loc.input_role_in_company(page)
-        self.input_address = loc.input_address(page)
-        self.input_email = loc.input_email(page)
-        self.input_phone_number = loc.input_phone_number(page)
-        self.resultado_final = loc.resultado_final(page)
 
     def iniciar_desafio(self, url: str) -> None:
         """
-        Navega para a URL do desafio e clica no botão 'Start'.
+        Navega para a URL do desafio e clica em 'Start'.
 
         Deve ser chamado uma única vez antes do preenchimento dos formulários.
 
         Args:
             url: URL do sistema a ser acessado, proveniente das configurações.
         """
-        self.logs.info('Navegando para a URL do RPA Challenge.')
-        self.page.goto(url)
-        self.btn_start.click()
+        self.logs.info(f'Navegando para o RPA Challenge com o driver {self.driver.nome}.')
+        self.driver.abrir(url)
+        self.driver.clicar_iniciar()
         self.logs.info('Desafio iniciado com sucesso.')
 
     def preencher_formulario(self, item: Item) -> None:
         """
-        Preenche todos os campos do formulário com os dados do item lido do banco
-        e clica em 'Submit'.
+        Preenche todos os campos do formulário e envia.
 
         Args:
             item: Schema Pydantic com os dados do registro atual,
                   lido da tabela item via get_queued_items_by_run.
         """
         self.logs.info(f'Preenchendo formulário: {item.First_Name} {item.Last_Name}.')
-        self.input_first_name.fill(item.First_Name)
-        self.input_last_name.fill(item.Last_Name)
-        self.input_company_name.fill(item.Company_Name)
-        self.input_role_in_company.fill(item.Role_in_Company)
-        self.input_address.fill(item.Address)
-        self.input_email.fill(item.Email)
-        self.input_phone_number.fill(item.Phone_Number)
 
-        # Envia o formulário após preencher todos os campos
-        self.btn_submit.click()
+        for rotulo, atributo in CAMPOS_DO_FORMULARIO.items():
+            self.driver.preencher_campo(rotulo, getattr(item, atributo))
 
-    def capturar_resultado(self) -> str | None:
+        self.driver.enviar()
+
+    def capturar_resultado(self) -> str:
         """
-        Lê o texto do resultado final exibido após o envio do último formulário.
+        Devolve o texto do resultado final exibido após o último envio.
 
-        A leitura é imediata, sem espera explícita: se o site ainda não tiver
-        renderizado o resultado, o retorno pode ser None.
+        A espera pelo elemento é responsabilidade do driver, garantida pelo
+        contrato — por isso o retorno é str, e não str | None como antes.
 
         Returns:
-            str | None: Texto do resultado, ou None se o elemento estiver vazio.
+            str: Texto do resultado, ex.: 'Your success rate is 100% ...'.
         """
-        resultado = self.resultado_final.text_content()
+        resultado = self.driver.ler_resultado()
         self.logs.info(resultado)
 
         return resultado

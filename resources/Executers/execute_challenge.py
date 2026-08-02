@@ -1,12 +1,12 @@
 """
 1 - Funções de passos da execução do RPA Challenge.
 2 - Responsável pela leitura de dados e pela automação do formulário.
-3 - Recebe (page, logs) como parâmetros, seguindo o padrão do projeto.
+3 - Recebe (driver, logs) como parâmetros, seguindo o padrão do projeto.
 """
 
 import pandas as pd
-from playwright.sync_api import Page
 
+from resources.Drivers.base import BrowserDriver
 from resources.models import ItemRunStatus
 from resources.Modules.challenge import Challenge
 from resources.Schemas.item_run import ItemInfo
@@ -32,7 +32,7 @@ def ler_dados(logs: Logs) -> pd.DataFrame:
 
 
 def executar_challenge(
-    page: Page,
+    driver: BrowserDriver,
     logs: Logs,
     items: list[ItemInfo],
     url: str,
@@ -46,7 +46,7 @@ def executar_challenge(
     QUEUED → PROCESSING → COMPLETED (ou FAILED em caso de erro).
 
     Args:
-        page: Instância da página do Playwright.
+        driver: Implementação de BrowserDriver (Playwright, Selenium, ...).
         logs: Instância de Logs para registro das operações.
         items: Lista de ItemInfo lidos do banco com status QUEUED.
         url: URL do RPA Challenge.
@@ -57,7 +57,7 @@ def executar_challenge(
     """
     total = len(items)
     logs.info('Iniciando desafio.')
-    challenge = Challenge(page, logs)
+    challenge = Challenge(driver, logs)
     challenge.iniciar_desafio(url)
 
     item_ids: list[int] = []
