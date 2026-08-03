@@ -59,6 +59,8 @@ test = 'pytest -m "not e2e" --cov=resources -vv'
 post_test = 'coverage html'
 # A pista lenta, sob demanda: sobe navegador e depende do site estar no ar.
 e2e = 'pytest -m e2e -vv'
+# Comparativo entre os drivers. Manual, fora do CI, exige PATH_BROWSER.
+benchmark = 'python -m benchmarks.compare_drivers'
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
