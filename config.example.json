@@ -1,9 +1,6 @@
 {
     "PROJECT_NAME": "rpa_challenge",
     "AREA": "Hiperautomação",
-    "SERVER_BOTCITY": "https://developers.botcity.dev/",
-    "LOGIN_BOTCITY": "<seu_login_botcity>",
-    "KEY_BOTCITY": "<sua_chave_botcity>",
     "PATH_URL": "https://rpachallenge.com/",
     "DRIVER": "playwright",
     "PATH_BROWSER": "",

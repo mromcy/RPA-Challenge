@@ -16,11 +16,46 @@ from pathlib import Path
 from typing import Any
 
 from cryptography.fernet import Fernet
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Raiz do repositório: settings.py mora em resources/, então dois níveis acima.
-# Serve de âncora tanto para localizar o config.json quanto para os caminhos padrão.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+
+VARIAVEL_DE_CONFIG = 'RPA_CHALLENGE_CONFIG'
+"""
+Variável de ambiente que aponta onde está o config.json.
+
+Existe para o caso em que o código roda de um diretório diferente daquele onde a
+configuração vive — que é exatamente o que um orquestrador faz. O runner do
+BotCity, por exemplo, extrai o pacote em `...\\BotCity\\run\\temp\\` e executa
+de lá; sem esta variável, a busca relativa ao código não acharia nada.
+
+Não definida, a busca cai na raiz do repositório, e quem clona roda sem
+configurar nada.
+"""
+
+
+def caminho_do_config() -> Path:
+    """
+    Resolve onde procurar o config.json.
+
+    A variável de ambiente aceita tanto a pasta quanto o arquivo — uma forma a
+    menos de errar na hora de configurar a máquina. A distinção é feita pela
+    extensão, e **não** consultando o disco: usar `is_dir()` faria o significado
+    do valor mudar conforme a pasta já existir ou não, e um caminho digitado
+    errado produziria mensagem de erro apontando para o lugar errado.
+
+    Returns:
+        Path: Caminho completo do arquivo de configuração.
+    """
+    definido = os.getenv(VARIAVEL_DE_CONFIG)
+    if not definido:
+        return _REPO_ROOT / 'config.json'
+
+    caminho = Path(definido)
+
+    return caminho if caminho.suffix else caminho / 'config.json'
 
 
 class Settings(BaseSettings):
@@ -31,18 +66,39 @@ class Settings(BaseSettings):
     PROJECT_NAME: str
     AREA: str
 
-    SERVER_BOTCITY: str
-    LOGIN_BOTCITY: str
-    KEY_BOTCITY: str
-
     PATH_URL: str
 
-    # Caminhos com padrão derivado da raiz do repositório: um clone roda sem
-    # configurar caminho nenhum. Continuam aceitos no config.json e o valor de lá
-    # vence — em produção, PATH_IN e PATH_OUT costumam ser pastas de rede.
-    PATH_BASE: str = str(_REPO_ROOT)
-    PATH_IN: str = str(_REPO_ROOT / 'Entrada')
-    PATH_OUT: str = str(_REPO_ROOT / 'Saida')
+    # Vazio significa "derive" — ver _derivar_caminhos. O valor do config.json
+    # sempre vence, o que mantém PATH_IN e PATH_OUT apontáveis para pastas de
+    # rede, como costumam ser em produção.
+    PATH_BASE: str = ''
+    PATH_IN: str = ''
+    PATH_OUT: str = ''
+
+    @model_validator(mode='after')
+    def _derivar_caminhos(self) -> Settings:
+        """
+        Preenche os caminhos que o config.json não informou.
+
+        A derivação é encadeada, e a ordem importa: PATH_BASE primeiro, porque
+        PATH_IN e PATH_OUT pendem dele **já resolvido** — se o config declarar
+        um PATH_BASE, as pastas de entrada e saída acompanham.
+
+        PATH_BASE cai na pasta onde o config.json foi encontrado, e não na raiz
+        do repositório. É o que faz uma única variável de ambiente resolver
+        configuração, credenciais, logs e downloads de uma vez: secret/ e logs/
+        são vizinhos da **configuração**, não do código.
+        """
+        if not self.PATH_BASE:
+            self.PATH_BASE = str(caminho_do_config().parent)
+
+        if not self.PATH_IN:
+            self.PATH_IN = str(Path(self.PATH_BASE) / 'Entrada')
+
+        if not self.PATH_OUT:
+            self.PATH_OUT = str(Path(self.PATH_BASE) / 'Saida')
+
+        return self
 
     DRIVER: str = 'playwright'
     """Driver usado quando a linha de comando não especifica outro."""
@@ -119,15 +175,16 @@ class Settings(BaseSettings):
         """Define o config.json como fonte principal de configuração."""
 
         def json_config_settings_source() -> dict[str, Any]:
-            # O config.json fica na raiz do repositório e NUNCA deve ser commitado:
-            # ele contém credenciais reais. O .gitignore já o bloqueia — use o
-            # config.example.json (esse sim versionado) como modelo.
-            json_path = _REPO_ROOT / 'config.json'
+            # O config.json NUNCA deve ser commitado: contém credenciais reais.
+            # O .gitignore já o bloqueia — use o config.example.json como modelo.
+            json_path = caminho_do_config()
 
             if not json_path.exists():
                 raise FileNotFoundError(
                     f'Arquivo de configuração não encontrado em: {json_path}\n'
-                    'Copie config.example.json para config.json e preencha os valores.'
+                    'Copie config.example.json para config.json e preencha os '
+                    'valores, ou defina a variável de ambiente '
+                    f'{VARIAVEL_DE_CONFIG} apontando para onde ele está.'
                 )
 
             with json_path.open('r', encoding='utf-8-sig') as f:

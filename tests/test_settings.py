@@ -17,16 +17,13 @@ from pathlib import Path
 import pytest
 
 from resources import settings as modulo_settings
-from resources.settings import Settings
+from resources.settings import VARIAVEL_DE_CONFIG, Settings, caminho_do_config
 
 RAIZ_REPO = Path(__file__).resolve().parents[1]
 
 CONFIG_MINIMO = {
     'PROJECT_NAME': 'projeto_de_teste',
     'AREA': 'area_de_teste',
-    'SERVER_BOTCITY': 'https://exemplo.invalido/',
-    'LOGIN_BOTCITY': 'login_de_teste',
-    'KEY_BOTCITY': 'chave_de_teste',
     'PATH_URL': 'https://exemplo.invalido/desafio',
     'HOST_DB_POSTGRES': 'localhost',
     'PORT_DB_POSTGRES': 5432,
@@ -48,30 +45,72 @@ def _escrever_config(pasta: Path, **extras) -> None:
     )
 
 
-def test_path_base_padrao_e_a_raiz_do_repositorio():
-    assert Settings.model_fields['PATH_BASE'].default == str(RAIZ_REPO)
+def test_sem_a_variavel_o_config_e_procurado_na_raiz_do_repositorio(monkeypatch):
+    monkeypatch.delenv(VARIAVEL_DE_CONFIG, raising=False)
+
+    assert caminho_do_config() == RAIZ_REPO / 'config.json'
 
 
-def test_path_in_padrao_aponta_para_entrada_na_raiz():
-    assert Settings.model_fields['PATH_IN'].default == str(RAIZ_REPO / 'Entrada')
+def test_variavel_aceita_a_pasta(tmp_path, monkeypatch):
+    monkeypatch.setenv(VARIAVEL_DE_CONFIG, str(tmp_path))
+
+    assert caminho_do_config() == tmp_path / 'config.json'
 
 
-def test_path_out_padrao_aponta_para_saida_na_raiz():
-    assert Settings.model_fields['PATH_OUT'].default == str(RAIZ_REPO / 'Saida')
+def test_variavel_aceita_o_arquivo(tmp_path, monkeypatch):
+    alvo = tmp_path / 'outro_nome.json'
+    alvo.touch()
+    monkeypatch.setenv(VARIAVEL_DE_CONFIG, str(alvo))
+
+    assert caminho_do_config() == alvo
 
 
-def test_usa_o_padrao_quando_o_config_json_omite_os_caminhos(raiz_falsa):
+def test_pasta_inexistente_ainda_e_tratada_como_pasta(monkeypatch):
     """
-    O caso de quem clona o repositório: config.json sem PATH_IN nem PATH_OUT.
-    Na máquina do Marco esse caminho nunca roda, porque o config dele preenche
-    as duas chaves.
+    A distinção é pela extensão, não por consultar o disco. Com `is_dir()`, um
+    caminho de pasta ainda não criada seria lido como nome de arquivo, e a
+    mensagem de erro apontaria para o lugar errado — o usuário procuraria o
+    problema onde ele não está.
+    """
+    monkeypatch.setenv(VARIAVEL_DE_CONFIG, r'D:\pasta\que\nao\existe')
+
+    assert caminho_do_config() == Path(r'D:\pasta\que\nao\existe\config.json')
+
+
+def test_path_base_padrao_e_a_pasta_do_config(raiz_falsa):
+    """
+    Ancorar no config, e não na raiz do repositório, é o que faz uma única
+    variável de ambiente resolver credenciais, logs e downloads junto — eles
+    são vizinhos da configuração, não do código.
     """
     _escrever_config(raiz_falsa)
 
     settings = Settings()  # type: ignore[call-arg]
 
-    assert settings.PATH_IN == str(RAIZ_REPO / 'Entrada')
-    assert settings.PATH_OUT == str(RAIZ_REPO / 'Saida')
+    assert settings.PATH_BASE == str(raiz_falsa)
+
+
+def test_entrada_e_saida_derivam_do_path_base(raiz_falsa):
+    """O caso de quem clona: config.json sem PATH_IN nem PATH_OUT."""
+    _escrever_config(raiz_falsa)
+
+    settings = Settings()  # type: ignore[call-arg]
+
+    assert settings.PATH_IN == str(raiz_falsa / 'Entrada')
+    assert settings.PATH_OUT == str(raiz_falsa / 'Saida')
+
+
+def test_entrada_e_saida_acompanham_o_path_base_declarado(raiz_falsa):
+    """
+    A derivação é encadeada: declarar só PATH_BASE reposiciona as duas pastas,
+    sem precisar repetir os caminhos.
+    """
+    _escrever_config(raiz_falsa, PATH_BASE=r'D:\robos\rpa_challenge')
+
+    settings = Settings()  # type: ignore[call-arg]
+
+    assert settings.PATH_IN == r'D:\robos\rpa_challenge\Entrada'
+    assert settings.PATH_OUT == r'D:\robos\rpa_challenge\Saida'
 
 
 def test_config_json_vence_o_padrao(raiz_falsa):
@@ -81,7 +120,7 @@ def test_config_json_vence_o_padrao(raiz_falsa):
     settings = Settings()  # type: ignore[call-arg]
 
     assert settings.PATH_IN == r'\\servidor\setor\entrada'
-    assert settings.PATH_OUT == str(RAIZ_REPO / 'Saida')
+    assert settings.PATH_OUT == str(raiz_falsa / 'Saida')
 
 
 def test_config_json_ausente_levanta_erro_explicativo(raiz_falsa):
