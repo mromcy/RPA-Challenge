@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import NoResultFound
 
 from resources.database import get_session
@@ -215,6 +215,42 @@ class OperationDb:
                 )
                 for pr, ir, it in rows
             ]
+
+    @staticmethod
+    def contar_processados_e_falhados(run_id: int) -> tuple[int, int]:
+        """
+        Conta quantos itens da execução concluíram e quantos falharam.
+
+        É a **fonte da verdade** para o relato ao orquestrador. Contadores em
+        memória param de ser atualizados quando uma falha de execução interrompe
+        o laço — navegador que morre, site que sai do ar —, e aí o painel
+        receberia zeros enquanto o banco já tem dezenas de itens gravados como
+        COMPLETED. Aqui o número vem de onde o estado realmente mora.
+
+        A tradução de status para números acontece aqui porque é esta camada que
+        conhece o ItemRunStatus; quem chama recebe dois inteiros e não precisa
+        saber como o estado é representado.
+
+        Args:
+            run_id: Identificador da execução.
+
+        Returns:
+            tuple[int, int]: (processados, falhados).
+        """
+        with get_session() as session:
+            stmt = (
+                select(ORMItemRun.status, func.count())
+                .where(ORMItemRun.run_id == run_id)  # type: ignore[arg-type]
+                .group_by(ORMItemRun.status)
+            )
+            por_status = {
+                status: quantidade for status, quantidade in session.execute(stmt)
+            }
+
+        return (
+            por_status.get(ItemRunStatus.COMPLETED.value, 0),
+            por_status.get(ItemRunStatus.FAILED.value, 0),
+        )
 
     @staticmethod
     def update_item_run_status(

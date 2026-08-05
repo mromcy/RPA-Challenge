@@ -11,14 +11,19 @@ Responsabilidades:
 
 import traceback
 
-from botcity.maestro import AutomationTaskFinishStatus, BotMaestroSDK
+from botcity.maestro import BotMaestroSDK
 
-from resources.Drivers.factory import criar_driver
+from resources.Drivers.factory import criar_driver, resolver_driver
 from resources.Executers.execute_challenge import executar_challenge, ler_dados
 from resources.models import ProcessRunStatus
 from resources.settings import get_settings
 from resources.Tools.add_process_run import AddProcessRun
-from resources.Tools.botcity import login  # noqa
+from resources.Tools.botcity import (
+    Contagem,
+    obter_parametros_da_task,
+    reportar_conclusao,
+    reportar_falha,
+)
 from resources.Tools.logs import Logs
 from resources.Utils.create_items import create_items
 from resources.Utils.operation_db import OperationDb
@@ -39,23 +44,32 @@ class Execute:
         run_id: Identificador único desta execução, gerado no banco ao iniciar.
     """
 
-    def __init__(self, driver: str | None = None):
+    def __init__(self, maestro: BotMaestroSDK, driver: str | None = None):
         """
         Args:
-            driver: 'playwright' ou 'selenium'. Omitido, usa Settings.DRIVER.
+            maestro: SDK já inicializado pelo ponto de entrada. Recebido pronto,
+                e não criado aqui, para não abrir uma segunda conexão com o
+                orquestrador — o bot.py precisa do SDK antes desta classe
+                existir, para conseguir reportar falhas de partida.
+            driver: 'playwright' ou 'selenium', vindo da linha de comando.
+                Omitido, o driver é decidido em três camadas — ver
+                Drivers.factory.resolver_driver.
         """
-        self.driver_escolhido = driver
-        self.maestro = BotMaestroSDK()
-        self.maestro = BotMaestroSDK.from_sys_args()
-
-        if not self.maestro.task_id:
-            print('Executando em modo local (sem task_id).')
-            self.execution = None
-        else:
-            self.execution = self.maestro.get_execution()
+        self.maestro = maestro
+        parametros_da_task = obter_parametros_da_task(maestro)
 
         self.logs = Logs(self.maestro)
         self.settings = get_settings()
+        self.driver_escolhido = resolver_driver(driver, parametros_da_task)
+
+        # Sem argumento na linha de comando, um driver escolhido só pode ter
+        # vindo do parâmetro da task — e registrar a origem poupa quem investiga
+        # de conferir três lugares para saber por que aquele driver rodou.
+        if self.driver_escolhido and not driver:
+            self.logs.info(
+                f'Driver definido pelo parâmetro da task: {self.driver_escolhido}.'
+            )
+
         self.db = OperationDb()
 
         # Cria o registro inicial no banco; a partir daqui, run_id identifica
@@ -83,7 +97,9 @@ class Execute:
         self.db.update_process_run_status(self.run_id, ProcessRunStatus.RUNNING)
         self.logs.info(f'run_id={self.run_id} → RUNNING')
 
-        total = processed = failed = 0
+        total = 0
+        resultado = ''
+        nome_do_driver = self.driver_escolhido or self.settings.DRIVER
 
         try:
             # Lê o Excel e persiste item_run + item no banco
@@ -98,9 +114,10 @@ class Execute:
 
             # Janela visível: o operador acompanha o robô preenchendo o formulário.
             driver = criar_driver(self.driver_escolhido, headless=False)
+            nome_do_driver = driver.nome
             self.logs.info(f'Driver selecionado: {driver.nome}.')
             try:
-                processed, failed = executar_challenge(
+                resultado = executar_challenge(
                     driver, self.logs, items, self.settings.PATH_URL, self.db
                 )
             finally:
@@ -117,18 +134,13 @@ class Execute:
             self.db.update_process_run_status(self.run_id, ProcessRunStatus.COMPLETED)
             self.logs.info(f'run_id={self.run_id} → COMPLETED')
 
-            if self.maestro.task_id:
-                self.maestro.finish_task(
-                    task_id=str(self.maestro.task_id),
-                    status=AutomationTaskFinishStatus.SUCCESS,
-                    message=(
-                        f'Execução concluída com sucesso. Processados: {processed} '
-                        f'- Falhados: {failed} - Total de itens: {total}'
-                    ),
-                    total_items=total,
-                    processed_items=processed,
-                    failed_items=failed,
-                )
+            processados, falhados = self.db.contar_processados_e_falhados(self.run_id)
+            reportar_conclusao(
+                self.maestro,
+                Contagem(total, processados, falhados),
+                nome_do_driver,
+                resultado,
+            )
 
         except Exception as e:
             # Captura o stacktrace completo para diagnóstico no banco
@@ -142,13 +154,22 @@ class Execute:
             self.logs.error(e)
             self.logs.info(f'run_id={self.run_id} → FAILED')
 
-            if self.maestro.task_id:
-                self.maestro.finish_task(
-                    task_id=str(self.maestro.task_id),
-                    status=AutomationTaskFinishStatus.FAILED,
-                    message=str(e),
-                    total_items=total,
-                    processed_items=processed,
-                    failed_items=failed,
+            # A consulta roda enquanto tentamos reportar outra exceção: deixá-la
+            # estourar mascararia o problema original, que é o que interessa.
+            try:
+                processados, falhados = self.db.contar_processados_e_falhados(
+                    self.run_id
                 )
+            except Exception as erro_de_consulta:
+                self.logs.warning(
+                    f'Não foi possível contar os itens: {erro_de_consulta}'
+                )
+                processados = falhados = 0
+
+            reportar_falha(
+                self.maestro,
+                e,
+                Contagem(total, processados, falhados),
+                nome_do_driver,
+            )
             raise
