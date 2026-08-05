@@ -52,7 +52,12 @@ markers = [
 lint = 'ruff check .'
 format = 'ruff check . --fix --exit-zero && ruff format .'
 run = 'python bot.py'
+# Poetry é ferramenta de desenvolvimento; quem só quer rodar o bot instala pelo
+# requirements.txt, que é também o que o runner do BotCity consome.
 export = 'poetry export -f requirements.txt --output requirements.txt --without-hashes'
+# O de desenvolvimento inclui ruff, pytest e taskipy: sem ele, quem clona com pip
+# não consegue rodar a suíte — que é justamente o que um revisor quer fazer.
+export-dev = 'poetry export --with dev -f requirements.txt --output requirements-dev.txt --without-hashes'
 pre_test = 'task lint'
 # A pista rápida exclui e2e: sem rede, sem navegador, roda a cada alteração.
 test = 'pytest -m "not e2e" --cov=resources -vv'
