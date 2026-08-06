@@ -1,0 +1,18 @@
+# Line endings are normalized to LF in the repository; working copies get the
+# platform's native endings on checkout. Without this, what lands in a blob
+# depends on each contributor's core.autocrlf, and the Linux CI runner receives
+# whatever a Windows machine happened to commit.
+* text=auto
+
+# Must keep LF even when checked out on Windows: a CR in a shebang line makes
+# Linux fail with "bad interpreter".
+*.sh text eol=lf
+
+# Declared as binary instead of left to content detection. Git already guesses
+# right for these, but a guess is not a contract, and normalizing a spreadsheet
+# or a GIF corrupts the file.
+*.xlsx binary
+*.xls  binary
+*.gif  binary
+*.png  binary
+*.zip  binary
