@@ -327,7 +327,9 @@ of any measured difference would be browser against browser.
 
 - **Python** 3.13 — pinned, not a floor: the version the tests actually run on,
   in CI and here. An unattended robot pins its interpreter for the same reason it
-  pins its browser, and a range nobody exercises is a promise, not a fact
+  pins its browser, and a range nobody exercises is a promise, not a fact. The bot
+  refuses to start on any other version and says why, because `pip` would install
+  nothing and still report success
 - **PostgreSQL** 13+, local or reachable over the network
 - **Google Chrome** — needed by the Selenium driver; the Playwright driver ships
   its own Chromium
@@ -603,7 +605,7 @@ the live one.
 
 | Lane | Tests | Needs | Time |
 |---|---|---|---|
-| unit | 46 | nothing | ~2 s |
+| unit | 80 | nothing | ~2 s |
 | e2e | 2 | network + browser | ~20 s |
 
 **Why they are separated.** The end-to-end tests depend on a system nobody here
@@ -612,6 +614,12 @@ on every push produces red builds for reasons unrelated to the code, and a team
 that sees red often enough learns to answer it with "run it again" — including
 the day the red is real. The live lane belongs on a schedule and on demand, not
 on every commit.
+
+**That separation is what `.github/workflows/ci.yml` implements.** The fast lane
+and a check that the exported `requirements*.txt` still match `pyproject.toml`
+gate every push and pull request. The live lane runs Monday mornings and from
+the Actions tab, never on a push, as two jobs — one per driver — so a failure
+names the driver that broke without anyone opening a log.
 
 **The fast lane needs no configuration at all.** No database, no `config.json`,
 no browser. That is a property held on purpose, and two tests assert it by
