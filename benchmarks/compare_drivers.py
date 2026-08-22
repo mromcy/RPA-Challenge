@@ -197,10 +197,7 @@ def medir_arquivo(caminho: Path) -> dict[str, int]:
 
 def _resumo(valores: list[float]) -> str:
     """Mediana com mínimo e máximo entre parênteses, em segundos."""
-    return (
-        f'**{statistics.median(valores):.2f}** '
-        f'({min(valores):.2f}–{max(valores):.2f})'
-    )
+    return f'**{statistics.median(valores):.2f}** ({min(valores):.2f}–{max(valores):.2f})'
 
 
 def imprimir_resultados(
@@ -217,9 +214,7 @@ def imprimir_resultados(
         totais = [e['total'] for e in execucoes]
         fills = [e['fill'] for e in execucoes]
         restos = [e['total'] - e['fill'] for e in execucoes]
-        print(
-            f'| {nome} | {_resumo(totais)} | {_resumo(fills)} | {_resumo(restos)} |'
-        )
+        print(f'| {nome} | {_resumo(totais)} | {_resumo(fills)} | {_resumo(restos)} |')
 
     print(
         '\nMediana de '

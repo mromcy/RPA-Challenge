@@ -41,9 +41,7 @@ def test_reporta_falha_com_o_tipo_e_o_texto_da_excecao():
     argumentos = maestro.finish_task.call_args.kwargs
     assert argumentos['status'] == AutomationTaskFinishStatus.FAILED
     assert argumentos['task_id'] == '24475890'
-    assert argumentos['message'] == (
-        'FileNotFoundError: config.json não encontrado'
-    )
+    assert argumentos['message'] == ('FileNotFoundError: config.json não encontrado')
 
 
 def test_task_id_numerico_vira_texto():
@@ -73,9 +71,7 @@ def test_falha_sem_driver_nao_deixa_sufixo_vazio():
 
     reportar_falha(maestro, RuntimeError('falhou'))
 
-    assert maestro.finish_task.call_args.kwargs['message'] == (
-        'RuntimeError: falhou'
-    )
+    assert maestro.finish_task.call_args.kwargs['message'] == ('RuntimeError: falhou')
 
 
 def test_falha_de_partida_reporta_contagem_zerada():

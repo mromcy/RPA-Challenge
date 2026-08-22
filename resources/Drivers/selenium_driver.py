@@ -66,9 +66,7 @@ class SeleniumDriver:
         None, que não diz o que fazer.
         """
         if self._navegador is None:
-            raise RuntimeError(
-                'Driver do Selenium não iniciado: chame abrir(url) antes.'
-            )
+            raise RuntimeError('Driver do Selenium não iniciado: chame abrir(url) antes.')
         return self._navegador
 
     def _esperar(
@@ -155,9 +153,7 @@ class SeleniumDriver:
 
     def clicar_iniciar(self) -> None:
         """Clica em 'Start'."""
-        self._esperar(
-            EC.element_to_be_clickable, seletores.XPATH_BOTAO_INICIAR
-        ).click()
+        self._esperar(EC.element_to_be_clickable, seletores.XPATH_BOTAO_INICIAR).click()
 
     def preencher_campo(self, rotulo: str, valor: str) -> None:
         """
@@ -174,9 +170,7 @@ class SeleniumDriver:
 
     def enviar(self) -> None:
         """Clica em 'Submit'."""
-        self._esperar(
-            EC.element_to_be_clickable, seletores.XPATH_BOTAO_ENVIAR
-        ).click()
+        self._esperar(EC.element_to_be_clickable, seletores.XPATH_BOTAO_ENVIAR).click()
 
     def ler_resultado(self) -> str:
         """

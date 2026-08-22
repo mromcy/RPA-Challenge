@@ -127,9 +127,7 @@ class Execute:
                 try:
                     driver.fechar()
                 except Exception as erro_de_limpeza:
-                    self.logs.warning(
-                        f'Falha ao fechar o navegador: {erro_de_limpeza}'
-                    )
+                    self.logs.warning(f'Falha ao fechar o navegador: {erro_de_limpeza}')
 
             self.db.update_process_run_status(self.run_id, ProcessRunStatus.COMPLETED)
             self.logs.info(f'run_id={self.run_id} → COMPLETED')
@@ -157,13 +155,9 @@ class Execute:
             # A consulta roda enquanto tentamos reportar outra exceção: deixá-la
             # estourar mascararia o problema original, que é o que interessa.
             try:
-                processados, falhados = self.db.contar_processados_e_falhados(
-                    self.run_id
-                )
+                processados, falhados = self.db.contar_processados_e_falhados(self.run_id)
             except Exception as erro_de_consulta:
-                self.logs.warning(
-                    f'Não foi possível contar os itens: {erro_de_consulta}'
-                )
+                self.logs.warning(f'Não foi possível contar os itens: {erro_de_consulta}')
                 processados = falhados = 0
 
             reportar_falha(

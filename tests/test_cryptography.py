@@ -65,9 +65,7 @@ def test_ler_credenciais_devolve_os_valores_originais(tmp_path, cofre):
     """
     cofre()
 
-    usuario, senha = Cryptography(path_secrets=tmp_path).ler_credenciais(
-        'db_credentials'
-    )
+    usuario, senha = Cryptography(path_secrets=tmp_path).ler_credenciais('db_credentials')
 
     assert (usuario, senha) == (USUARIO, SENHA)
 

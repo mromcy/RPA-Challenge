@@ -96,9 +96,7 @@ def main() -> None:
     for driver in DRIVERS:
         quantidade = len(falhas[driver])
         taxa = quantidade / argumentos.repeticoes
-        print(
-            f'| {driver} | {argumentos.repeticoes} | {quantidade} | {taxa:.0%} |'
-        )
+        print(f'| {driver} | {argumentos.repeticoes} | {quantidade} | {taxa:.0%} |')
 
     # A regra dos três é uma aproximação; abaixo de ~3 execuções ela devolveria
     # um limite maior que 100%, que não quer dizer nada.

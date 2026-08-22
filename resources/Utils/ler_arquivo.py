@@ -34,7 +34,8 @@ def limpar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         DataFrame tratado. O original permanece intacto.
     """
     return (
-        df.set_axis(df.columns.str.strip(), axis=1)
+        df
+        .set_axis(df.columns.str.strip(), axis=1)
         .dropna(axis=1, how='all')
         .dropna(axis=0, how='all')
     )
