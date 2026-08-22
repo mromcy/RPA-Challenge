@@ -14,8 +14,14 @@ Maestro com a causa real; no topo do arquivo, derrubaria o processo antes de
 existir alguém para reportá-la — e faria o `--help` exigir configuração pronta.
 """
 
-from resources.cli import obter_driver_dos_argumentos
-from resources.Tools.botcity import conectar, reportar_falha
+from resources.ambiente import exigir_python_suportado
+
+# Antes dos imports abaixo: com a versão errada, nada foi instalado e o SDK do
+# Maestro estouraria primeiro, calando a mensagem que diz o que fazer.
+exigir_python_suportado()
+
+from resources.cli import obter_driver_dos_argumentos  # noqa: E402
+from resources.Tools.botcity import conectar, reportar_falha  # noqa: E402
 
 if __name__ == '__main__':
     driver = obter_driver_dos_argumentos()

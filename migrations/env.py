@@ -1,3 +1,4 @@
+from contextlib import closing
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -32,14 +33,17 @@ target_metadata = table_registry.metadata
 
 
 def create_schemas_if_not_exists(engine, schema_name:str) ->None:
-    raw_connection = engine.raw_connection()
-    try:
-        cursor = raw_connection.cursor()
+    # O `closing` fecha cada recurso mesmo quando a linha seguinte falha. Antes,
+    # o cursor era criado dentro do try e fechado no finally: se `.cursor()`
+    # estourasse — conexão invalidada no pool, por exemplo — o finally rodava
+    # com o nome inexistente e o NameError substituía o erro de verdade, ainda
+    # deixando a conexão aberta.
+    with (
+        closing(engine.raw_connection()) as raw_connection,
+        closing(raw_connection.cursor()) as cursor,
+    ):
         cursor.execute(f'CREATE SCHEMA IF NOT EXISTS {schema_name}')
         raw_connection.commit()
-    finally:
-        cursor.close()
-        raw_connection.close()
     print(f'Schema {schema_name} verificado ou criado')    
     
 
