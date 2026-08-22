@@ -24,6 +24,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
 
 from resources.database import engine
+from resources.Schemas.item_run import ItemRunStatus
 from resources.settings import get_settings
 
 external_md = MetaData(schema='process_manager')
@@ -85,16 +86,6 @@ class ProcessRunStatus(str, enum.Enum):
     COMPLETED = 'COMPLETED'
     FAILED = 'FAILED'
     CANCELED = 'CANCELED'
-
-
-class ItemRunStatus(str, enum.Enum):
-    QUEUED = 'QUEUED'
-    PROCESSING = 'PROCESSING'
-    COMPLETED = 'COMPLETED'
-    FAILED = 'FAILED'
-    EXCEPTION = 'EXCEPTION'
-    ON_HOLD = 'ON_HOLD'
-    DEFERRED = 'DEFERRED'
 
 
 @table_registry.mapped_as_dataclass

@@ -4,15 +4,27 @@
 3 - Recebe (driver, logs) como parâmetros, seguindo o padrão do projeto.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pandas as pd
 
 from resources.Drivers.base import BrowserDriver
-from resources.models import ItemRunStatus
 from resources.Modules.challenge import Challenge
-from resources.Schemas.item_run import ItemInfo
+from resources.Schemas.item_run import ItemInfo, ItemRunStatus
 from resources.Tools.logs import Logs
 from resources.Utils.ler_arquivo import LerArquivo
-from resources.Utils.operation_db import OperationDb
+
+# O OperationDb aparece só na assinatura de executar_challenge; em runtime quem
+# chega aqui é o objeto pronto, vindo do execute.py. Importá-lo de verdade traria
+# junto o resources.models, que conecta no banco durante o import — e este módulo
+# passaria a exigir PostgreSQL para ser importado, inclusive pelos testes, que
+# passam um dublê no lugar. O from __future__ import annotations acima é o que
+# permite a anotação sobreviver sem o import: ela não é avaliada em tempo de
+# execução.
+if TYPE_CHECKING:
+    from resources.Utils.operation_db import OperationDb
 
 
 def ler_dados(logs: Logs) -> pd.DataFrame:

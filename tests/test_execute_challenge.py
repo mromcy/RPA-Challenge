@@ -9,8 +9,7 @@ verifica a máquina de estados por item sem PostgreSQL nenhum.
 from unittest.mock import MagicMock
 
 from resources.Executers.execute_challenge import executar_challenge
-from resources.models import ItemRunStatus
-from resources.Schemas.item_run import Item, ItemInfo, ItemRun
+from resources.Schemas.item_run import Item, ItemInfo, ItemRun, ItemRunStatus
 from resources.Schemas.process_run import ProcessRun
 from tests.fake_driver import FakeDriver
 

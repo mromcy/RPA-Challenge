@@ -6,12 +6,34 @@ e suas execuções. São usados para trafegar informações entre banco de dados
 automações e APIs.
 """
 
+import enum
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict
 
 from resources.Schemas.process_run import ProcessRun
+
+
+class ItemRunStatus(str, enum.Enum):
+    """
+    Estados possíveis de um item na fila de processamento.
+
+    Mora aqui, e não em resources.models, de propósito: importar models abre
+    conexão com o banco (a process_run é refletida com autoload_with=engine no
+    import), e quem só precisa nomear um status não deveria pagar esse preço.
+    O models importa este enum para tipar a coluna do ORM — a dependência
+    aponta do lado que precisa de banco para o lado que não precisa, nunca ao
+    contrário.
+    """
+
+    QUEUED = 'QUEUED'
+    PROCESSING = 'PROCESSING'
+    COMPLETED = 'COMPLETED'
+    FAILED = 'FAILED'
+    EXCEPTION = 'EXCEPTION'
+    ON_HOLD = 'ON_HOLD'
+    DEFERRED = 'DEFERRED'
 
 
 class ItemRun(BaseModel):
