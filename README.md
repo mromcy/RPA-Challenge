@@ -1,6 +1,6 @@
 # RPA Challenge — production-style bot with two browser drivers
 
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Python](https://img.shields.io/badge/python-3.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 <!-- TODO(P5): add the GitHub Actions CI badge once the workflow exists. It has
      to be the dynamic one that reflects the real last run — a hand-written
@@ -325,7 +325,9 @@ of any measured difference would be browser against browser.
 
 ## Requirements
 
-- **Python** 3.11–3.13
+- **Python** 3.13 — pinned, not a floor: the version the tests actually run on,
+  in CI and here. An unattended robot pins its interpreter for the same reason it
+  pins its browser, and a range nobody exercises is a promise, not a fact
 - **PostgreSQL** 13+, local or reachable over the network
 - **Google Chrome** — needed by the Selenium driver; the Playwright driver ships
   its own Chromium
@@ -848,7 +850,7 @@ Sample output:
 
 | Tool | Constraint | Role |
 |---|---|---|
-| [Python](https://python.org) | >=3.11,<3.14 | Language |
+| [Python](https://python.org) | >=3.13,<3.14 | Language |
 | [Playwright](https://playwright.dev/python/) | >=1.58 | Browser driver 1 |
 | [Selenium](https://selenium.dev) | >=4.46 | Browser driver 2 |
 | [SQLAlchemy](https://sqlalchemy.org) | >=2.0.51 | ORM and database access |
