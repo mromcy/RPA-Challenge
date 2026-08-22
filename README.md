@@ -383,6 +383,12 @@ poetry install
 **generated** from `pyproject.toml` by `task export` and `task export-dev` —
 add dependencies there, not in the `.txt` files.
 
+Those two tasks call `poetry export`, which Poetry 2 no longer ships in its
+core, so run `poetry self add poetry-plugin-export` once before using them. CI
+installs the same plugin, re-exports both files and fails the build if either
+one differs from what `pyproject.toml` produces — which is what keeps the two
+`.txt` files from quietly falling behind.
+
 ### 3. Install the browser Playwright manages
 
 ```bash
