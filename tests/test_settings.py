@@ -76,16 +76,23 @@ def test_variavel_aceita_o_arquivo(tmp_path, monkeypatch):
     assert caminho_do_config() == alvo
 
 
-def test_pasta_inexistente_ainda_e_tratada_como_pasta(monkeypatch):
+def test_pasta_inexistente_ainda_e_tratada_como_pasta(tmp_path, monkeypatch):
     """
     A distinção é pela extensão, não por consultar o disco. Com `is_dir()`, um
     caminho de pasta ainda não criada seria lido como nome de arquivo, e a
     mensagem de erro apontaria para o lugar errado — o usuário procuraria o
     problema onde ele não está.
-    """
-    monkeypatch.setenv(VARIAVEL_DE_CONFIG, r'D:\pasta\que\nao\existe')
 
-    assert caminho_do_config() == Path(r'D:\pasta\que\nao\existe\config.json')
+    A pasta sai do tmp_path e **nunca é criada** — existir no disco é justamente
+    o que não pode importar aqui. O caminho é nativo de propósito: um literal de
+    Windows faria o teste afirmar o separador da máquina que o roda, e não o
+    contrato do código.
+    """
+    pasta_nunca_criada = tmp_path / 'pasta' / 'que' / 'nao' / 'existe'
+    monkeypatch.setenv(VARIAVEL_DE_CONFIG, str(pasta_nunca_criada))
+
+    assert not pasta_nunca_criada.exists()
+    assert caminho_do_config() == pasta_nunca_criada / 'config.json'
 
 
 def test_path_base_padrao_e_a_pasta_do_config(raiz_falsa):
@@ -116,12 +123,13 @@ def test_entrada_e_saida_acompanham_o_path_base_declarado(raiz_falsa):
     A derivação é encadeada: declarar só PATH_BASE reposiciona as duas pastas,
     sem precisar repetir os caminhos.
     """
-    _escrever_config(raiz_falsa, PATH_BASE=r'D:\robos\rpa_challenge')
+    outra_base = raiz_falsa / 'robos' / 'rpa_challenge'
+    _escrever_config(raiz_falsa, PATH_BASE=str(outra_base))
 
     settings = Settings()  # type: ignore[call-arg]
 
-    assert settings.PATH_IN == r'D:\robos\rpa_challenge\Entrada'
-    assert settings.PATH_OUT == r'D:\robos\rpa_challenge\Saida'
+    assert settings.PATH_IN == str(outra_base / 'Entrada')
+    assert settings.PATH_OUT == str(outra_base / 'Saida')
 
 
 def test_config_json_vence_o_padrao(raiz_falsa):
