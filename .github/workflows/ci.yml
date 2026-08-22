@@ -1,0 +1,129 @@
+name: CI
+
+# Two lanes with different natures, kept in one file so the contract is read in
+# one place. The fast lane gates every push. The live lane depends on a site
+# nobody here controls, so it never blocks a commit: it runs weekly and on
+# demand, and a red result there is a question about the world, not the code.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Monday 12:17 UTC, which is 09:17 in Fortaleza. The odd minute is
+    # deliberate: GitHub delays - and under load, drops - scheduled runs at the
+    # top of the hour, because that is where everyone schedules theirs.
+    - cron: '17 12 * * 1'
+
+env:
+  # One version, the one the tests actually run on. See requires-python.
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  lint-and-unit:
+    name: lint and unit tests
+    # The schedule exists for the live lane. Re-running lint every Monday would
+    # report nothing that the last push did not already report.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      # This is the path the README documents for anyone who clones, and the
+      # one the BotCity runner uses. Installing with Poetry instead would
+      # verify a file that no consumer of this project reads.
+      - name: Install dependencies the way a cloner does
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Formatting
+        run: ruff format --check .
+
+      # No config.json, no database, no browser. The suite claims to need none
+      # of them - two tests assert the settings cache is never touched - and
+      # this job is where that claim meets a machine that has none.
+      - name: Fast lane
+        run: pytest -m "not e2e" --cov=resources
+
+  requirements-sync:
+    name: exported requirements match pyproject
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry with the export plugin
+        run: |
+          pipx install poetry
+          pipx inject poetry poetry-plugin-export
+
+      # Only the dev group, which is where taskipy lives. Running the export
+      # through the tasks keeps a single source of truth for the command:
+      # repeating the flags here would let this job and pyproject.toml drift.
+      - name: Install the dev group
+        run: poetry install --only dev
+
+      - name: Re-export both files
+        run: |
+          poetry run task export
+          poetry run task export-dev
+
+      # The risk is not hypothetical: requirements.txt shipped without selenium
+      # between 31 July and 3 August 2026, because the export was forgotten
+      # after the dependency was added.
+      - name: Fail if the exported files drifted
+        run: git diff --exit-code requirements.txt requirements-dev.txt
+
+  e2e:
+    name: e2e
+    # Never on push. The end-to-end tests reach rpachallenge.com, and a build
+    # that goes red because someone else's site is down teaches a team to
+    # answer red with "run it again" - including the day the red is real.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # The drivers wait up to 30 s per action; a hung site should end the job,
+    # not hold a runner for the default six hours.
+    timeout-minutes: 15
+    strategy:
+      # Two jobs rather than one parametrised run: when the live lane breaks,
+      # the question is *which driver* broke, and the job name answers it
+      # without anyone opening a log. fail-fast would cancel the second driver
+      # as soon as the first fails, which is exactly the answer being sought.
+      fail-fast: false
+      matrix:
+        driver: [playwright, selenium]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      # Playwright drives the Chromium it manages, so it has to download it -
+      # with the system libraries, which a bare runner does not have. Selenium
+      # drives the Google Chrome that ships with the runner image, and Selenium
+      # Manager resolves the matching chromedriver on its own.
+      - name: Install the browser Playwright manages
+        if: matrix.driver == 'playwright'
+        run: playwright install --with-deps chromium
+
+      # The end-to-end test is parametrised over both drivers; -k selects the
+      # one this job owns.
+      - name: Live lane against rpachallenge.com
+        run: pytest -m e2e -k ${{ matrix.driver }}
