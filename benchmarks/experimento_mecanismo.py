@@ -31,6 +31,8 @@ from __future__ import annotations
 
 import argparse
 import statistics
+from collections.abc import Callable
+from typing import Any
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
@@ -53,7 +55,15 @@ class SeleniumSemEspera(SeleniumDriver):
 
     nome = 'selenium-sem-espera'
 
-    def _esperar(self, condicao, seletor: str) -> WebElement:  # noqa: ARG002
+    def _esperar(
+        self,
+        # `| None` alarga o parâmetro em relação ao driver de produção, e é
+        # honesto: esta variante ignora a condição, então quem chama não tem o
+        # que passar. Alargar parâmetro em sobrescrita é legal e não obriga o
+        # driver real a aceitar None.
+        condicao: Callable[[tuple[str, str]], Any] | None,  # noqa: ARG002
+        seletor: str,
+    ) -> WebElement:
         return self._navegador_ativo.find_element(By.XPATH, seletor)
 
 

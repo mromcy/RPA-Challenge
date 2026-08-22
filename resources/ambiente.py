@@ -9,8 +9,17 @@ import sys
 
 VERSAO_EXIGIDA = (3, 13)
 
+VERSAO_EM_USO = (sys.version_info.major, sys.version_info.minor)
+"""
+Versão do interpretador que está rodando, como par de inteiros.
 
-def exigir_python_suportado(versao: tuple[int, ...] = sys.version_info) -> None:
+Extraída campo a campo, e não de `sys.version_info` inteiro, porque aquele
+objeto tem cinco posições e a quarta é texto (`'final'`, `'beta'`) — não é uma
+tupla de inteiros, por mais que as duas primeiras posições pareçam.
+"""
+
+
+def exigir_python_suportado(versao: tuple[int, ...] = VERSAO_EM_USO) -> None:
     """
     Encerra com mensagem legível se o interpretador não for o suportado.
 

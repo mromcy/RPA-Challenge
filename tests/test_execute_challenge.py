@@ -122,6 +122,10 @@ def test_item_com_erro_e_marcado_como_failed_com_o_motivo():
         if chamada.args[1] == ItemRunStatus.FAILED
     ]
     assert len(falhas) == 1
+    # A asserção seguinte lê item_run.item_id, que o schema declara opcional.
+    # Escrever a suposição aqui troca um AttributeError em None por uma falha
+    # que diz qual premissa do teste deixou de valer.
+    assert item_ruim.item_run is not None
     assert falhas[0].args[0] == item_ruim.item_run.item_id
     assert 'campo recusado' in falhas[0].kwargs['exception_reason']
 

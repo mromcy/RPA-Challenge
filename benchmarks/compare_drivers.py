@@ -62,6 +62,13 @@ class _SemLog:
 
     O Challenge registra uma linha por formulário; com 12 execuções isso seriam
     centenas de linhas competindo com a tabela de resultados na saída.
+
+    Mesmo papel que o FakeDriver cumpre nos testes, com uma diferença que o type
+    checker cobra: `BrowserDriver` é um Protocol, e conformidade estrutural
+    basta; `Logs` é classe concreta, e quem a recebe anota a classe. Por isso as
+    duas chamadas abaixo levam `pyright: ignore` — decisão registrada, não
+    esquecimento. Fazer `Logs` virar Protocol resolveria de verdade, e é mudança
+    em anotações de produção para benefício de um script de medição.
     """
 
     def info(self, *_, **__) -> None: ...
@@ -93,7 +100,10 @@ def versao_do_navegador(caminho: str) -> str:
 
 def carregar_itens() -> list[Item]:
     """Os registros de Entrada/, pelo mesmo caminho que a produção percorre."""
-    dados = LerArquivo(_SemLog(), path_in=RAIZ / 'Entrada').ler_arquivo()
+    dados = LerArquivo(
+        _SemLog(),  # pyright: ignore[reportArgumentType]
+        path_in=RAIZ / 'Entrada',
+    ).ler_arquivo()
 
     return [
         Item(
@@ -122,7 +132,10 @@ def uma_execucao(nome: str, itens: list[Item], path_browser: str) -> dict[str, f
             o tempo. Resultado parcial não é medição válida.
     """
     driver = CONSTRUTORES[nome](headless=True, path_browser=path_browser)
-    challenge = Challenge(driver, _SemLog())
+    challenge = Challenge(
+        driver,
+        _SemLog(),  # pyright: ignore[reportArgumentType]
+    )
 
     try:
         inicio = time.perf_counter()
