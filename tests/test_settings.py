@@ -6,9 +6,10 @@ valores padrão de PATH_BASE/PATH_IN/PATH_OUT (o config.json dele preenche
 PATH_IN e PATH_OUT) e a resolução do config.json pela raiz do repositório (o
 dele sempre existe). Ambos só são exercitados por quem clona — e pelo CI.
 
-O truque é trocar _REPO_ROOT por uma pasta temporária: o loader lê essa variável
-do módulo no momento da chamada, então apontá-la para tmp_path faz o Settings
-procurar o config.json lá dentro.
+O truque é neutralizar as duas metades de caminho_do_config(): apagar a variável
+de ambiente e trocar _REPO_ROOT por uma pasta temporária. O loader consulta as
+duas no momento da chamada, então o Settings passa a procurar o config.json
+dentro de tmp_path.
 """
 
 import json
@@ -34,7 +35,17 @@ CONFIG_MINIMO = {
 
 @pytest.fixture
 def raiz_falsa(tmp_path, monkeypatch):
-    """Faz o loader do config.json procurar dentro de tmp_path."""
+    """
+    Faz o loader do config.json procurar dentro de tmp_path.
+
+    Apagar a variável de ambiente não é zelo extra, é a outra metade do trabalho:
+    caminho_do_config() consulta RPA_CHALLENGE_CONFIG **antes** de cair no
+    _REPO_ROOT, e trocar só a raiz deixaria viva a metade que vence. Numa máquina
+    onde a variável está definida — a do Marco, por causa do runner do BotCity —
+    o Settings leria o config.json real, e estes testes afirmariam sobre a
+    configuração da máquina em vez da que a fixture acabou de escrever.
+    """
+    monkeypatch.delenv(VARIAVEL_DE_CONFIG, raising=False)
     monkeypatch.setattr(modulo_settings, '_REPO_ROOT', tmp_path)
     return tmp_path
 
