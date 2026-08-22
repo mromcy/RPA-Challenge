@@ -15,7 +15,8 @@ on:
     - cron: '17 12 * * 1'
 
 env:
-  # One version, the one the tests actually run on. See requires-python.
+  # The version the live lane and the export job use. The fast lane runs the
+  # ends of the supported range instead - see its matrix.
   PYTHON_VERSION: '3.13'
 
 jobs:
@@ -25,12 +26,20 @@ jobs:
     # report nothing that the last push did not already report.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The ends of the range requires-python declares, not every version in
+        # it. Compatibility breaks at the edges, and the fast lane costs two
+        # seconds, so covering both turns the declared range into a measured
+        # one for the price of a second job.
+        python: ['3.11', '3.13']
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: requirements-dev.txt
 

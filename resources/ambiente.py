@@ -7,7 +7,24 @@ precisa ser importável exatamente na máquina em que nada mais está instalado.
 
 import sys
 
-VERSAO_EXIGIDA = (3, 13)
+VERSAO_MINIMA = (3, 11)
+"""
+Menor Python aceito, inclusivo.
+
+Não é escolha de gosto: é o piso que as dependências declaram. Dos 60 pacotes
+instalados, numpy e pandas são os mais exigentes, e ambos pedem `>=3.11`.
+"""
+
+VERSAO_ACIMA_DA_MAXIMA = (3, 14)
+"""
+Primeira versão **não** aceita, exclusivo.
+
+O teto tem dono: o `psycopg-binary` publica wheel por versão de interpretador, e
+a 3.2.9 — fixada com `==` no pyproject.toml — vai até cp313. Em 3.14 o pip não
+encontra binário, tenta compilar da fonte e precisa de libpq e compilador C, o
+que não existe numa estação Windows comum. Quando o psycopg subir para uma
+versão com wheel cp314, este teto pode subir junto.
+"""
 
 VERSAO_EM_USO = (sys.version_info.major, sys.version_info.minor)
 """
@@ -21,14 +38,13 @@ tupla de inteiros, por mais que as duas primeiras posições pareçam.
 
 def exigir_python_suportado(versao: tuple[int, ...] = VERSAO_EM_USO) -> None:
     """
-    Encerra com mensagem legível se o interpretador não for o suportado.
+    Encerra com mensagem legível se o interpretador estiver fora da faixa.
 
-    A verificação é de igualdade, e não de mínimo, porque é o que os
-    `requirements*.txt` dizem: eles são exportados com o marcador
-    ``python_version == "3.13"`` em toda linha. Em qualquer outra versão, o pip
-    ignora todas elas, **não instala dependência alguma e ainda assim encerra
-    com código 0** — um deploy que confere código de saída vê sucesso. A falha
-    só apareceria depois, como um ModuleNotFoundError que não explica a causa.
+    Fora dela o problema não se anuncia sozinho: os `requirements*.txt` são
+    exportados com marcadores dessa mesma faixa, e o pip **ignora toda linha que
+    não casa, não instala nada e ainda assim encerra com código 0** — um deploy
+    que confere código de saída vê sucesso. A falha só apareceria depois, como
+    um ModuleNotFoundError que nomeia um pacote em vez da causa.
 
     Args:
         versao: A versão a conferir. O padrão é a do interpretador em execução;
@@ -36,17 +52,19 @@ def exigir_python_suportado(versao: tuple[int, ...] = VERSAO_EM_USO) -> None:
             de um segundo Python instalado.
 
     Raises:
-        SystemExit: Se a versão em execução não for a exigida.
+        SystemExit: Se a versão em execução estiver fora da faixa suportada.
     """
-    if versao[:2] == VERSAO_EXIGIDA:
+    if VERSAO_MINIMA <= versao[:2] < VERSAO_ACIMA_DA_MAXIMA:
         return
 
-    exigida = '.'.join(str(parte) for parte in VERSAO_EXIGIDA)
-    encontrada = '.'.join(str(parte) for parte in versao[:2])
+    def formatar(partes: tuple[int, ...]) -> str:
+        return '.'.join(str(parte) for parte in partes)
 
     raise SystemExit(
-        f'Este robô exige Python {exigida}; encontrado {encontrada}.\n'
-        f'Os requirements são exportados com o marcador python_version == '
-        f'"{exigida}", então em outra versão o pip não instala dependência '
-        'alguma e ainda assim reporta sucesso.'
+        f'Este robô exige Python >= {formatar(VERSAO_MINIMA)} e '
+        f'< {formatar(VERSAO_ACIMA_DA_MAXIMA)}; encontrado '
+        f'{formatar(versao[:2])}.\n'
+        'Os requirements são exportados com marcadores dessa faixa, então fora '
+        'dela o pip não instala dependência alguma e ainda assim reporta '
+        'sucesso.'
     )

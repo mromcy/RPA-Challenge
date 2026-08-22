@@ -6,7 +6,7 @@ authors = [{ name = "Marco Romcy", email = "marcoromcy@gmail.com" }]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "alembic>=1.17.0,<2.0.0",
     "botcity-maestro-sdk>=0.9.0,<0.10.0",

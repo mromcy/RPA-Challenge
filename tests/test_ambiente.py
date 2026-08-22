@@ -11,28 +11,29 @@ from pathlib import Path
 
 import pytest
 
-from resources.ambiente import VERSAO_EXIGIDA, exigir_python_suportado
+from resources.ambiente import exigir_python_suportado
 
 MODULO = Path(__file__).resolve().parents[1] / 'resources' / 'ambiente.py'
 
 
-def test_a_versao_exigida_passa_sem_reclamar():
-    exigir_python_suportado((*VERSAO_EXIGIDA, 5))
+@pytest.mark.parametrize('minor', [11, 12, 13])
+def test_toda_versao_da_faixa_passa_sem_reclamar(minor):
+    exigir_python_suportado((3, minor, 4))
 
 
-def test_versao_antiga_e_recusada_dizendo_qual_foi_encontrada():
+def test_versao_abaixo_do_piso_e_recusada_dizendo_qual_foi_encontrada():
     with pytest.raises(SystemExit) as erro:
-        exigir_python_suportado((3, 12, 4))
+        exigir_python_suportado((3, 10, 14))
 
-    assert '3.13' in str(erro.value)
-    assert '3.12' in str(erro.value)
+    assert '3.11' in str(erro.value)
+    assert '3.10' in str(erro.value)
 
 
-def test_versao_mais_nova_tambem_e_recusada():
+def test_versao_acima_do_teto_tambem_e_recusada():
     """
-    A trava é de igualdade, não de mínimo, e é o caso mais fácil de errar: numa
-    máquina com 3.14 o pip ignora todas as linhas dos requirements, não instala
-    nada e encerra com sucesso. "Mais novo" não é "compatível" aqui.
+    O caso mais fácil de errar, porque "mais nova" soa como "compatível": em
+    3.14 o `psycopg-binary` fixado não tem wheel, e antes disso o pip já ignora
+    todas as linhas dos requirements, não instala nada e encerra com sucesso.
     """
     with pytest.raises(SystemExit):
         exigir_python_suportado((3, 14, 0))
