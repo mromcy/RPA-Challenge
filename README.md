@@ -20,8 +20,8 @@ compared on the same flow with the same code.
 
 <!-- The demo is not recorded yet; the line stays commented out because GitHub
      renders a missing image as a broken-image icon, and this is the first
-     screen of the page. Spec in docs/README.md.
-![Demo](docs/demo.gif)
+     screen of the page. Uncomment it when assets/demo.gif exists.
+![Demo](assets/demo.gif)
 -->
 
 ---
