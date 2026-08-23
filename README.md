@@ -620,7 +620,7 @@ the live one.
 
 | Lane | Tests | Needs | Time |
 |---|---|---|---|
-| unit | 80 | nothing | ~2 s |
+| unit | 82 | nothing | ~2 s |
 | e2e | 2 | network + browser | ~20 s |
 
 **Why they are separated.** The end-to-end tests depend on a system nobody here
