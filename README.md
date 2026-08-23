@@ -1,10 +1,13 @@
 # RPA Challenge — production-style bot with two browser drivers
 
+[![CI](https://github.com/mromcy/RPA-Challenge/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/mromcy/RPA-Challenge/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11--3.13-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-<!-- TODO(P5): add the GitHub Actions CI badge once the workflow exists. It has
-     to be the dynamic one that reflects the real last run — a hand-written
-     "tests: N" badge is decoration, and an experienced reviewer can tell. -->
+<!-- The badge is filtered to event=push on purpose. Unfiltered, it would show
+     the last run of the whole workflow, and that includes the Monday schedule
+     with the live lane against rpachallenge.com - so a badge could go red
+     because someone else's site was down, which is the exact confusion this
+     project separated the two lanes to avoid. -->
 
 
 A Python RPA bot that solves the [RPA Challenge](https://rpachallenge.com/): it
@@ -15,8 +18,11 @@ orchestrator integration — and it drives the browser through **two
 interchangeable implementations, Playwright and Selenium**, so the two can be
 compared on the same flow with the same code.
 
-<!-- TODO: Marco records docs/demo.gif — see docs/README.md for the spec -->
+<!-- The demo is not recorded yet; the line stays commented out because GitHub
+     renders a missing image as a broken-image icon, and this is the first
+     screen of the page. Spec in docs/README.md.
 ![Demo](docs/demo.gif)
+-->
 
 ---
 
