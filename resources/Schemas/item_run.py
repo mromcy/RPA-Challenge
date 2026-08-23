@@ -1,9 +1,8 @@
 """
-Definições de esquemas Pydantic para itens e execuções.
+Pydantic schema definitions for items and their runs.
 
-Este módulo contém modelos de dados que representam informações de itens
-e suas execuções. São usados para trafegar informações entre banco de dados,
-automações e APIs.
+This module holds the data models that carry item information around. They are
+used to move information between the database, the automations and any APIs.
 """
 
 import enum
@@ -17,14 +16,14 @@ from resources.Schemas.process_run import ProcessRun
 
 class ItemRunStatus(str, enum.Enum):
     """
-    Estados possíveis de um item na fila de processamento.
+    The states an item can be in while it sits in the processing queue.
 
-    Mora aqui, e não em resources.models, de propósito: importar models abre
-    conexão com o banco (a process_run é refletida com autoload_with=engine no
-    import), e quem só precisa nomear um status não deveria pagar esse preço.
-    O models importa este enum para tipar a coluna do ORM — a dependência
-    aponta do lado que precisa de banco para o lado que não precisa, nunca ao
-    contrário.
+    It lives here, and not in resources.models, on purpose: importing models
+    opens a database connection (process_run is reflected with
+    autoload_with=engine at import time), and code that only needs to name a
+    status should not pay that price. models imports this enum to type the ORM
+    column — the dependency points from the side that needs a database to the
+    side that does not, never the other way around.
     """
 
     QUEUED = 'QUEUED'
@@ -38,28 +37,28 @@ class ItemRunStatus(str, enum.Enum):
 
 class ItemRun(BaseModel):
     """
-    Representa a execução de um item em um processo automatizado.
+    Represents one item's run inside an automated process.
 
-    Atributos:
-        item_id (int): Identificador do item.
-        run_id (int): Identificador do processo em execução.
-        process_name (str): Nome do processo associado.
-        item_key (str): Chave única do item.
-        area (str): Área responsável pelo item.
-        priority (int): Prioridade de execução do item.
-        status (str): Status atual do item (ex.: RUNNING, COMPLETED).
-        tags (str): Tags adicionais associadas ao item.
-        resource_name (str): Nome do recurso utilizado.
-        attempt (int): Número de tentativas de processamento.
-        payload (Optional[Dict[str, Any]]): Dados adicionais do item.
-        created_at (Optional[datetime]): Data de criação do registro.
-        started_at (Optional[datetime]): Data de início do processamento.
-        last_updated_at (Optional[datetime]): Data da última atualização.
-        next_review_at (Optional[datetime]): Data da próxima revisão.
-        completed_at (Optional[datetime]): Data de conclusão.
-        total_work_time (Optional[timedelta]): Tempo total de execução.
-        exception_at (Optional[datetime]): Data em que houve exceção.
-        exception_reason (Optional[str]): Motivo da exceção.
+    Attributes:
+        item_id (int): Identifier of the item.
+        run_id (int): Identifier of the running process.
+        process_name (str): Name of the associated process.
+        item_key (str): Unique key of the item.
+        area (str): Area responsible for the item.
+        priority (int): Execution priority of the item.
+        status (str): Current status of the item (e.g. RUNNING, COMPLETED).
+        tags (str): Additional tags attached to the item.
+        resource_name (str): Name of the resource used.
+        attempt (int): Number of processing attempts.
+        payload (Optional[Dict[str, Any]]): Additional item data.
+        created_at (Optional[datetime]): When the record was created.
+        started_at (Optional[datetime]): When processing began.
+        last_updated_at (Optional[datetime]): When it was last updated.
+        next_review_at (Optional[datetime]): When it is due for review.
+        completed_at (Optional[datetime]): When it was completed.
+        total_work_time (Optional[timedelta]): Total processing time.
+        exception_at (Optional[datetime]): When the exception happened.
+        exception_reason (Optional[str]): Reason for the exception.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -87,26 +86,25 @@ class ItemRun(BaseModel):
 
 class Item(BaseModel):
     """
-    Dados de um registro do formulário do RPA Challenge.
+    The data of one record from the RPA Challenge form.
 
-    Cada instância corresponde a uma linha do arquivo de entrada e a uma rodada
-    do desafio. Os sete campos espelham os rótulos exibidos na página; o mapa
-    de rótulo para atributo vive em Modules/challenge.py, em
-    CAMPOS_DO_FORMULARIO.
+    Each instance matches one row of the input file and one round of the
+    challenge. The seven fields mirror the labels shown on the page; the map
+    from label to attribute lives in Modules/challenge.py, in FORM_FIELDS.
 
-    Atributos:
-        id (int): Chave primária do registro na tabela item.
-        item_id (int): Chave estrangeira para item_run.item_id, que liga este
-            registro à sua execução na fila.
-        First_Name (str): Campo 'First Name' do formulário.
-        Last_Name (str): Campo 'Last Name'.
-        Company_Name (str): Campo 'Company Name'.
-        Role_in_Company (str): Campo 'Role in Company'.
-        Address (str): Campo 'Address'.
-        Email (str): Campo 'Email'.
-        Phone_Number (str): Campo 'Phone Number'.
-        result (Optional[str]): Mensagem final do desafio, gravada após o
-            último envio — ex.: 'Your success rate is 100% (70 out of 70
+    Attributes:
+        id (int): Primary key of the record in the item table.
+        item_id (int): Foreign key to item_run.item_id, tying this record to
+            its run in the queue.
+        First_Name (str): The form's 'First Name' field.
+        Last_Name (str): The 'Last Name' field.
+        Company_Name (str): The 'Company Name' field.
+        Role_in_Company (str): The 'Role in Company' field.
+        Address (str): The 'Address' field.
+        Email (str): The 'Email' field.
+        Phone_Number (str): The 'Phone Number' field.
+        result (Optional[str]): The challenge's closing message, written after
+            the last submission — e.g. 'Your success rate is 100% (70 out of 70
             fields) in 678 milliseconds'.
     """
 
@@ -126,15 +124,15 @@ class Item(BaseModel):
 
 class ItemInfo(BaseModel):
     """
-    Agrupa um item, sua execução na fila e o processo que a originou.
+    Groups an item, its run in the queue and the process that started it.
 
-    É o formato devolvido por OperationDb.get_queued_items_by_run, que junta as
-    três tabelas numa consulta só.
+    It is the shape returned by OperationDb.get_queued_items_by_run, which
+    joins the three tables in a single query.
 
-    Atributos:
-        process_run (ProcessRun): Execução do processo à qual o item pertence.
-        item (Optional[Item]): Dados do formulário.
-        item_run (Optional[ItemRun]): Estado do item na fila.
+    Attributes:
+        process_run (ProcessRun): The process run the item belongs to.
+        item (Optional[Item]): The form data.
+        item_run (Optional[ItemRun]): The item's state in the queue.
     """
 
     process_run: ProcessRun

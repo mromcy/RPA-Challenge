@@ -1,21 +1,22 @@
 """
-Comunicação com o BotCity Maestro.
+Communication with BotCity Maestro.
 
-Toda conversa com o orquestrador passa por aqui: conectar, ler os parâmetros da
-task e reportar o desfecho. Os outros módulos entregam os dados e não montam
-mensagem de painel — antes desta consolidação o formato da mensagem de falha
-estava escrito em dois lugares, com um comentário confessando a duplicação.
+Every conversation with the orchestrator goes through here: connecting, reading
+the task parameters and reporting the outcome. The other modules hand over the
+data and do not assemble panel messages — before this was consolidated, the
+format of the failure message was written in two places, with a comment
+confessing the duplication.
 
-Este módulo **não importa configuração nem banco**, e não deve importar: o
-reportar_falha precisa funcionar justamente quando o config.json está ausente
-ou o banco está fora do ar, que são duas das falhas que ele existe para relatar.
+This module **imports neither settings nor database**, and must not: report_
+failure has to work precisely when config.json is missing or the database is
+down, which are two of the failures it exists to report.
 
-O robô se autentica pelo token de execução que o runner entrega na linha de
-comando, e não por chave de API guardada em arquivo. Consequência: não existe
-credencial de vida longa em repouso na máquina do robô. O caminho da chave de
-API só faria sentido para um processo que **liga** para o orquestrador em vez de
-ser chamado por ele — um portal interno que cria tasks, um vigia de pasta de
-rede, um pipeline de CI — e este bot nunca está nessa posição.
+The bot authenticates with the run token the runner hands it on the command
+line, not with an API key kept in a file. The consequence is that no long-lived
+credential sits at rest on the bot's machine. The API-key path would only make
+sense for a process that **calls** the orchestrator instead of being called by
+it — an internal portal that creates tasks, a network-folder watcher, a CI
+pipeline — and this bot is never in that position.
 """
 
 from collections.abc import Mapping
@@ -24,51 +25,52 @@ from typing import NamedTuple
 from botcity.maestro import AutomationTaskFinishStatus, BotMaestroSDK
 
 
-class Contagem(NamedTuple):
+class Counts(NamedTuple):
     """
-    Os três números que o painel do Maestro exibe para uma execução.
+    The three numbers the Maestro panel shows for a run.
 
-    Andam sempre juntos — são exatamente o que o finish_task recebe —, então
-    viajam como uma coisa só em vez de três parâmetros soltos.
+    They always travel together — they are exactly what finish_task receives —
+    so they move as one thing instead of three loose parameters. The field
+    names mirror the SDK's own: total_items, processed_items, failed_items.
     """
 
     total: int = 0
-    processados: int = 0
-    falhados: int = 0
+    processed: int = 0
+    failed: int = 0
 
 
-def conectar() -> BotMaestroSDK:
+def connect() -> BotMaestroSDK:
     """
-    Devolve o SDK pronto, funcionando nos dois modos de execução.
+    Returns the SDK ready to use, working in both execution modes.
 
-    O `from_sys_args()` resolve os dois sozinho: com quatro ou mais argumentos
-    na linha de comando, lê server/task_id/token/organization **por posição** e
-    conecta ao orquestrador; abaixo disso devolve uma instância local, com
-    task_id vazio, e nenhuma chamada ao Maestro tem efeito.
+    `from_sys_args()` sorts both out by itself: with four or more arguments on
+    the command line it reads server/task_id/token/organization **by position**
+    and connects to the orchestrator; below that it returns a local instance,
+    with an empty task_id, and no call to Maestro has any effect.
 
     Returns:
-        BotMaestroSDK: Conectado ao orquestrador ou em modo local.
+        BotMaestroSDK: Connected to the orchestrator, or in local mode.
     """
     maestro = BotMaestroSDK.from_sys_args()
 
     if not maestro.task_id:
-        print('Executando em modo local (sem task_id).')
+        print('Running in local mode (no task_id).')
 
     return maestro
 
 
-def obter_parametros_da_task(maestro: BotMaestroSDK) -> Mapping[str, object]:
+def get_task_parameters(maestro: BotMaestroSDK) -> Mapping[str, object]:
     """
-    Parâmetros informados ao disparar a task no painel.
+    The parameters supplied when the task was fired from the panel.
 
-    Em modo local devolve um dicionário vazio, o que poupa quem chama de checar
-    se há execução: o resultado tem sempre o mesmo tipo.
+    In local mode it returns an empty dictionary, which spares the caller from
+    checking whether there is a run at all: the result always has the same type.
 
     Args:
-        maestro: SDK já conectado.
+        maestro: An already connected SDK.
 
     Returns:
-        Mapping[str, object]: Parâmetros da task, ou vazio em modo local.
+        Mapping[str, object]: The task parameters, or empty in local mode.
     """
     if not maestro.task_id:
         return {}
@@ -76,94 +78,95 @@ def obter_parametros_da_task(maestro: BotMaestroSDK) -> Mapping[str, object]:
     return maestro.get_execution().parameters
 
 
-def reportar_conclusao(
+def report_completion(
     maestro: BotMaestroSDK,
-    contagem: Contagem,
+    counts: Counts,
     driver: str,
-    resultado: str,
+    result: str,
 ) -> None:
     """
-    Encerra a task que rodou até o fim, com o desfecho legível no painel.
+    Closes a task that ran to the end, with the outcome readable in the panel.
 
-    O status distingue os dois desfechos possíveis de uma execução completa:
-    `SUCCESS` quando nenhum item falhou, `PARTIALLY_COMPLETED` quando a fila
-    terminou mas houve itens com erro. `FAILED` fica reservado para a execução
-    que **não** chegou ao fim — é o que o reportar_falha usa.
+    The status distinguishes the two possible outcomes of a complete run:
+    `SUCCESS` when no item failed, `PARTIALLY_COMPLETED` when the queue
+    finished but some items errored. `FAILED` is reserved for a run that did
+    **not** reach the end — that is what report_failure uses.
 
-    A distinção importa para quem opera: "terminou, mas sete registros ficaram
-    para trás" pede uma ação diferente de "não rodou".
+    The distinction matters to whoever operates the bot: "it finished, but
+    seven records were left behind" calls for a different action than "it never
+    ran".
 
-    A mensagem leva o texto que o próprio site informou e o driver usado: é o
-    que o operador precisa saber sem abrir log nenhum.
+    The message carries the text the site itself reported and the driver used:
+    it is what the operator needs to know without opening any log.
 
     Args:
-        maestro: SDK já conectado. Sem task_id, não faz nada.
-        contagem: Total, processados e falhados.
-        driver: Nome do driver que executou.
-        resultado: Texto do resultado informado pelo site.
+        maestro: An already connected SDK. With no task_id, it does nothing.
+        counts: Total, processed and failed.
+        driver: Name of the driver that ran.
+        result: The result text reported by the site.
     """
     if not maestro.task_id:
         return
 
-    houve_falhas = contagem.falhados > 0
+    had_failures = counts.failed > 0
     status = (
         AutomationTaskFinishStatus.PARTIALLY_COMPLETED
-        if houve_falhas
+        if had_failures
         else AutomationTaskFinishStatus.SUCCESS
     )
-    abertura = 'Concluído com falhas' if houve_falhas else 'Concluído'
+    opening = 'Completed with failures' if had_failures else 'Completed'
 
     maestro.finish_task(
         task_id=str(maestro.task_id),
         status=status,
         message=(
-            f'{abertura} com {driver}. {resultado} '
-            f'Processados: {contagem.processados} '
-            f'- Falhados: {contagem.falhados} '
-            f'- Total de itens: {contagem.total}'
+            f'{opening} with {driver}. {result} '
+            f'Processed: {counts.processed} '
+            f'- Failed: {counts.failed} '
+            f'- Total items: {counts.total}'
         ),
-        total_items=contagem.total,
-        processed_items=contagem.processados,
-        failed_items=contagem.falhados,
+        total_items=counts.total,
+        processed_items=counts.processed,
+        failed_items=counts.failed,
     )
 
 
-def reportar_falha(
+def report_failure(
     maestro: BotMaestroSDK,
-    erro: Exception,
-    contagem: Contagem = Contagem(),
+    error: Exception,
+    counts: Counts = Counts(),
     driver: str = '',
 ) -> None:
     """
-    Encerra a task como FAILED, com a causa real.
+    Closes the task as FAILED, with the real cause.
 
-    Sem isto, uma falha de partida — `config.json` ausente, banco fora do ar,
-    driver inválido no parâmetro da task — mata o processo antes de qualquer
-    `finish_task`, e o painel mostra só *"An unexpected issue led to the task
-    being terminated"*, que não diz a ninguém o que fazer.
+    Without this, a startup failure — a missing `config.json`, a database that
+    is down, an invalid driver in the task parameter — kills the process before
+    any `finish_task`, and the panel shows only *"An unexpected issue led to
+    the task being terminated"*, which tells nobody what to do.
 
-    A mensagem leva o **tipo** da exceção junto do texto: `FileNotFoundError` e
-    `ValueError` mandam a investigação para lugares diferentes. O stack completo
-    fica de fora — cinquenta linhas num painel não ajudam ninguém — e continua
-    gravado em `process_run.error_stack` e no arquivo de log.
+    The message carries the **type** of the exception along with its text:
+    `FileNotFoundError` and `ValueError` send the investigation to different
+    places. The full stack stays out — fifty lines in a panel help nobody — and
+    is still recorded in `process_run.error_stack` and in the log file.
 
     Args:
-        maestro: SDK já conectado. Sem task_id, não faz nada.
-        erro: Exceção que interrompeu a execução.
-        contagem: Quanto havia sido processado até a falha. Numa falha de
-            partida, zeros — nada chegou a rodar.
-        driver: Driver em uso, quando já havia sido escolhido.
+        maestro: An already connected SDK. With no task_id, it does nothing.
+        error: The exception that interrupted the run.
+        counts: How much had been processed by the time of the failure. In a
+            startup failure, zeros — nothing got to run.
+        driver: The driver in use, when one had already been chosen.
     """
     if not maestro.task_id:
         return
 
-    sufixo = f' (driver: {driver})' if driver else ''
+    suffix = f' (driver: {driver})' if driver else ''
 
     maestro.finish_task(
         task_id=str(maestro.task_id),
         status=AutomationTaskFinishStatus.FAILED,
-        message=f'{type(erro).__name__}: {erro}{sufixo}',
-        total_items=contagem.total,
-        processed_items=contagem.processados,
-        failed_items=contagem.falhados,
+        message=f'{type(error).__name__}: {error}{suffix}',
+        total_items=counts.total,
+        processed_items=counts.processed,
+        failed_items=counts.failed,
     )

@@ -129,13 +129,13 @@ rpa_challenge/
 ├── migrations/versions/            # Alembic migration history
 ├── benchmarks/
 │   ├── compare_drivers.py          # The measured comparison
-│   ├── experimento_mecanismo.py    # Isolates *why* one driver is slower
-│   └── medir_flakiness.py          # Counts flaky runs per driver
+│   ├── mechanism_experiment.py     # Isolates *why* one driver is slower
+│   └── measure_flakiness.py        # Counts flaky runs per driver
 ├── tests/
 │   ├── conftest.py                 # Shared fixtures; isolates settings cache
 │   ├── fake_driver.py              # Records calls; no browser involved
 │   ├── test_challenge.py           # Business flow, incl. architecture guard
-│   ├── test_cli.py  test_cryptography.py  test_ler_arquivo.py
+│   ├── test_cli.py  test_cryptography.py  test_read_file.py
 │   ├── test_settings.py
 │   └── test_e2e_challenge.py       # Live site, both drivers (marker: e2e)
 └── resources/
@@ -146,11 +146,11 @@ rpa_challenge/
     ├── execute.py                  # Orchestrator, incl. BotCity integration
     ├── Drivers/
     │   ├── base.py                 # BrowserDriver protocol + shared timeout
-    │   ├── seletores.py            # Selectors, shared by both drivers
+    │   ├── selectors.py            # Selectors, shared by both drivers
     │   ├── playwright_driver.py    # Implementation 1
     │   ├── selenium_driver.py      # Implementation 2
     │   └── factory.py              # Builds the requested driver
-    ├── Executers/execute_challenge.py
+    ├── Executors/execute_challenge.py
     ├── Modules/challenge.py        # Business flow — knows no browser library
     ├── Schemas/                    # Pydantic: ItemRun, Item, ItemInfo, ProcessRun
     ├── Tools/                      # Logging, BotCity, process_run creation
@@ -196,13 +196,13 @@ wins on browser startup does not hold for this flow.
 
 ### Complexity
 
-Only the driver modules count: `base.py` and `seletores.py` are shared and
+Only the driver modules count: `base.py` and `selectors.py` are shared and
 belong to neither side.
 
 | Driver | statements | effective lines | explicit waits | `time.sleep` |
 |---|---|---|---|---|
-| **Playwright** | **47** | **57** | **1** | 0 |
-| **Selenium** | 55 | 75 | 4 | 0 |
+| **Playwright** | **47** | **55** | **1** | 0 |
+| **Selenium** | 55 | 69 | 4 | 0 |
 
 `statements` counts executable statements from the syntax tree and ignores
 docstrings — it measures how much the program *does*. `effective lines` drops
@@ -229,7 +229,7 @@ difference to be attributed to speed rather than reliability.
 
 ### Where the difference comes from
 
-A number without a mechanism is a blog post. `benchmarks/experimento_mecanismo.py`
+A number without a mechanism is a blog post. `benchmarks/mechanism_experiment.py`
 isolates one variable at a time by subclassing the production driver:
 
 | Variant | fill (s) | vs. Selenium |
@@ -313,8 +313,8 @@ volume of existing code are real arguments that this benchmark does not measure.
 
 ```bash
 poetry run task benchmark                              # timing, N=5
-poetry run python -m benchmarks.experimento_mecanismo  # where the time goes
-poetry run python -m benchmarks.medir_flakiness        # reliability
+poetry run python -m benchmarks.mechanism_experiment  # where the time goes
+poetry run python -m benchmarks.measure_flakiness     # reliability
 ```
 
 The benchmark refuses to run unless `PATH_BROWSER` is set, because otherwise
@@ -678,16 +678,16 @@ bot.py
         │
         ├── 3. update_process_run_status(RUNNING)
         │
-        ├── 4. ler_dados(logs) → LerArquivo(...).ler_arquivo()
+        ├── 4. read_data(logs) → FileReader(...).read_file()
         │      Reads every .xlsx in Entrada/, oldest first,
-        │      applies limpar_dataframe and concatenates
+        │      applies clean_dataframe and concatenates
         │
         ├── 5. create_items(df, run_id)
         │      For each row: ORMItemRun (QUEUED) + ORMItem with the form data
         │
         ├── 6. get_queued_items_by_run(run_id)
         │
-        ├── 7. criar_driver(...) → executar_challenge(driver, logs, items, url, db)
+        ├── 7. create_driver(...) → run_challenge(driver, logs, items, url, db)
         │      Launches the browser through the selected driver
         │      Opens the site and clicks Start
         │      For each item:
@@ -850,17 +850,13 @@ Written to three destinations at once:
 Sample output:
 
 ```
-2026-05-11 10:30:00 - RPA - [INFO] - Execução registrada no banco com run_id=42 (SCHEDULED)
-2026-05-11 10:30:01 - RPA - [INFO] - 10 itens persistidos no banco (QUEUED).
-2026-05-11 10:30:02 - RPA - [INFO] - 10 itens carregados do banco para processamento.
-2026-05-11 10:30:03 - RPA - [INFO] - Navegando para o RPA Challenge com o driver playwright.
-2026-05-11 10:30:15 - RPA - [INFO] - Preenchendo formulário 1/10.
-2026-05-11 10:31:00 - RPA - [INFO] - Execução concluída com sucesso.
+2026-05-11 10:30:00 - RPA - [INFO] - Run recorded in the database with run_id=42 (SCHEDULED)
+2026-05-11 10:30:01 - RPA - [INFO] - 10 items persisted to the database (QUEUED).
+2026-05-11 10:30:02 - RPA - [INFO] - 10 items loaded from the database for processing.
+2026-05-11 10:30:03 - RPA - [INFO] - Navigating to the RPA Challenge with the playwright driver.
+2026-05-11 10:30:15 - RPA - [INFO] - Filling form 1/10.
+2026-05-11 10:31:00 - RPA - [INFO] - Run completed successfully.
 ```
-
-> Log messages are still in Portuguese, matching the source. Translating the
-> codebase is tracked separately, as its own commit, so that a rename never
-> hides behind a behaviour change.
 
 ---
 

@@ -42,29 +42,29 @@ quote-style = 'single'
 [tool.pytest.ini_options]
 pythonpath = "."
 addopts = '-p no:warnings'
-# Registrar o marker faz o pytest recusar etiqueta desconhecida: sem isso, um
-# @pytest.mark.e2ee com erro de digitação criaria um teste que nunca roda.
+# Registering the marker makes pytest refuse an unknown label: without it, a
+# mistyped @pytest.mark.e2ee would create a test that never runs.
 markers = [
-    "e2e: fluxo completo contra o rpachallenge.com ao vivo; exige rede e navegador",
+    "e2e: full flow against the live rpachallenge.com; needs network and a browser",
 ]
 
 [tool.taskipy.tasks]
 lint = 'ruff check .'
 format = 'ruff check . --fix --exit-zero && ruff format .'
 run = 'python bot.py'
-# Poetry é ferramenta de desenvolvimento; quem só quer rodar o bot instala pelo
-# requirements.txt, que é também o que o runner do BotCity consome.
+# Poetry is a development tool; whoever only wants to run the bot installs
+# from requirements.txt, which is also what the BotCity runner consumes.
 export = 'poetry export -f requirements.txt --output requirements.txt --without-hashes'
-# O de desenvolvimento inclui ruff, pytest e taskipy: sem ele, quem clona com pip
-# não consegue rodar a suíte — que é justamente o que um revisor quer fazer.
+# The dev one includes ruff, pytest and taskipy: without it, whoever clones
+# with pip cannot run the suite - which is exactly what a reviewer wants to do.
 export-dev = 'poetry export --with dev -f requirements.txt --output requirements-dev.txt --without-hashes'
 pre_test = 'task lint'
-# A pista rápida exclui e2e: sem rede, sem navegador, roda a cada alteração.
+# The fast lane excludes e2e: no network, no browser, runs on every change.
 test = 'pytest -m "not e2e" --cov=resources -vv'
 post_test = 'coverage html'
-# A pista lenta, sob demanda: sobe navegador e depende do site estar no ar.
+# The slow lane, on demand: starts a browser and depends on the site being up.
 e2e = 'pytest -m e2e -vv'
-# Comparativo entre os drivers. Manual, fora do CI, exige PATH_BROWSER.
+# The driver comparison. Manual, outside CI, requires PATH_BROWSER.
 benchmark = 'python -m benchmarks.compare_drivers'
 
 [build-system]

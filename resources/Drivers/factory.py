@@ -1,8 +1,8 @@
 """
-Construção do driver a partir do nome.
+Building the driver from its name.
 
-É o único lugar do projeto que conhece as duas implementações ao mesmo tempo.
-O resto do código conhece apenas o contrato BrowserDriver.
+This is the only place in the project that knows both implementations at once.
+The rest of the code knows only the BrowserDriver contract.
 """
 
 from collections.abc import Mapping
@@ -10,98 +10,99 @@ from collections.abc import Mapping
 from resources.Drivers.base import BrowserDriver
 from resources.settings import get_settings
 
-DRIVERS_DISPONIVEIS = ('playwright', 'selenium')
+AVAILABLE_DRIVERS = ('playwright', 'selenium')
 
 
-def driver_dos_parametros(parametros: Mapping[str, object]) -> str | None:
+def driver_from_parameters(parameters: Mapping[str, object]) -> str | None:
     """
-    Lê o driver dos parâmetros de uma task do BotCity Maestro.
+    Reads the driver from the parameters of a BotCity Maestro task.
 
-    Permite escolher a biblioteca ao disparar a task pelo painel, sem redeploy
-    e sem registrar uma segunda automação. Fica aqui, e não no execute.py,
-    porque aquele módulo não pode ser importado sem banco — a regra ficaria
-    fora do alcance da suíte unitária.
+    It allows choosing the library when firing the task from the panel, with no
+    redeploy and without registering a second automation. It lives here, and
+    not in execute.py, because that module cannot be imported without a
+    database — the rule would be out of reach of the unit suite.
 
     Args:
-        parametros: Dicionário de parâmetros da execução. Vazio em modo local.
+        parameters: The run's parameter dictionary. Empty in local mode.
 
     Returns:
-        str | None: Nome do driver, ou None quando o parâmetro não foi
-            informado — caso em que a decisão volta para Settings.DRIVER.
+        str | None: The driver name, or None when the parameter was not
+            supplied — in which case the decision falls back to Settings.DRIVER.
 
     Raises:
-        ValueError: Se o parâmetro trouxer um driver desconhecido. Falha aqui,
-            na partida, é melhor que falhar depois de as migrações rodarem e o
-            registro da execução já existir no banco.
+        ValueError: If the parameter carries an unknown driver. Failing here,
+            at launch, is better than failing after the migrations have run and
+            the run record already exists in the database.
     """
-    valor = parametros.get('driver')
-    if not valor:
+    value = parameters.get('driver')
+    if not value:
         return None
 
-    nome = str(valor).strip().lower()
-    if nome not in DRIVERS_DISPONIVEIS:
+    name = str(value).strip().lower()
+    if name not in AVAILABLE_DRIVERS:
         raise ValueError(
-            f'Parâmetro "driver" da task com valor desconhecido: {valor!r}. '
-            f'Disponíveis: {", ".join(DRIVERS_DISPONIVEIS)}.'
+            f'Task parameter "driver" has an unknown value: {value!r}. '
+            f'Available: {", ".join(AVAILABLE_DRIVERS)}.'
         )
 
-    return nome
+    return name
 
 
-def resolver_driver(
-    da_linha_de_comando: str | None,
-    parametros_da_task: Mapping[str, object],
+def resolve_driver(
+    from_command_line: str | None,
+    task_parameters: Mapping[str, object],
 ) -> str | None:
     """
-    Decide o driver em três camadas, da mais específica para a mais geral.
+    Decides the driver in three layers, from the most specific to the most
+    general.
 
-    1. `--driver` na linha de comando: quem digitou agora quis isto agora.
-    2. Parâmetro `driver` da task do Maestro: escolha para *esta* execução,
-       feita no painel, sem redeploy.
-    3. `None`, deixando `criar_driver` cair no `DRIVER` do config.json, que é o
-       padrão da máquina.
-
-    Args:
-        da_linha_de_comando: Valor de `--driver`, se informado.
-        parametros_da_task: Parâmetros da execução. Vazio em modo local.
-
-    Returns:
-        str | None: Driver escolhido, ou None para usar o padrão da máquina.
-
-    Raises:
-        ValueError: Se o parâmetro da task trouxer um driver desconhecido.
-    """
-    return da_linha_de_comando or driver_dos_parametros(parametros_da_task)
-
-
-def criar_driver(nome: str | None = None, headless: bool = True) -> BrowserDriver:
-    """
-    Devolve o driver pedido, já configurado a partir das configurações.
-
-    Os imports das bibliotecas acontecem **dentro** de cada ramo, e não no topo
-    do módulo, por dois motivos. Primeiro, uma execução só deve pagar o custo de
-    importar a biblioteca que vai usar: `playwright.sync_api` carrega 177 módulos
-    e `selenium.webdriver` carrega 23. Segundo, e mais importante: o benchmark
-    mede o tempo de partida, e importar as duas em toda execução somaria o mesmo
-    custo aos dois lados, escondendo a diferença real de startup.
-
-    É por isso que as duas linhas de import carregam `noqa: PLC0415` — a regra
-    está certa como padrão, e esta é a exceção que ela existe para permitir.
+    1. `--driver` on the command line: whoever typed it now wanted this now.
+    2. The Maestro task's `driver` parameter: a choice for *this* run, made in
+       the panel, with no redeploy.
+    3. `None`, letting `create_driver` fall back to `DRIVER` from config.json,
+       which is the machine's default.
 
     Args:
-        nome: 'playwright' ou 'selenium'. Omitido, usa Settings.DRIVER.
-        headless: Sem janela visível.
+        from_command_line: The value of `--driver`, if supplied.
+        task_parameters: The run's parameters. Empty in local mode.
 
     Returns:
-        BrowserDriver: Implementação pronta para uso.
+        str | None: The chosen driver, or None to use the machine's default.
 
     Raises:
-        ValueError: Se o nome não corresponder a nenhum driver conhecido.
+        ValueError: If the task parameter carries an unknown driver.
+    """
+    return from_command_line or driver_from_parameters(task_parameters)
+
+
+def create_driver(name: str | None = None, headless: bool = True) -> BrowserDriver:
+    """
+    Returns the requested driver, already configured from the settings.
+
+    The library imports happen **inside** each branch, and not at the top of
+    the module, for two reasons. First, a run should only pay the cost of
+    importing the library it is going to use: `playwright.sync_api` loads 177
+    modules and `selenium.webdriver` loads 23. Second, and more importantly:
+    the benchmark measures startup time, and importing both on every run would
+    add the same cost to both sides, hiding the real startup difference.
+
+    That is why both import lines carry `noqa: PLC0415` — the rule is right as
+    a default, and this is the exception it exists to allow.
+
+    Args:
+        name: 'playwright' or 'selenium'. Omitted, uses Settings.DRIVER.
+        headless: No visible window.
+
+    Returns:
+        BrowserDriver: An implementation ready to use.
+
+    Raises:
+        ValueError: If the name matches no known driver.
     """
     settings = get_settings()
-    escolhido = (nome or settings.DRIVER).strip().lower()
+    chosen = (name or settings.DRIVER).strip().lower()
 
-    if escolhido == 'playwright':
+    if chosen == 'playwright':
         from resources.Drivers.playwright_driver import (  # noqa: PLC0415
             PlaywrightDriver,
         )
@@ -111,7 +112,7 @@ def criar_driver(nome: str | None = None, headless: bool = True) -> BrowserDrive
             path_browser=settings.PATH_BROWSER,
         )
 
-    if escolhido == 'selenium':
+    if chosen == 'selenium':
         from resources.Drivers.selenium_driver import (  # noqa: PLC0415
             SeleniumDriver,
         )
@@ -123,6 +124,5 @@ def criar_driver(nome: str | None = None, headless: bool = True) -> BrowserDrive
         )
 
     raise ValueError(
-        f'Driver desconhecido: {escolhido!r}. '
-        f'Disponíveis: {", ".join(DRIVERS_DISPONIVEIS)}.'
+        f'Unknown driver: {chosen!r}. Available: {", ".join(AVAILABLE_DRIVERS)}.'
     )

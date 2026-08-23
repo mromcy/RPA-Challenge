@@ -1,71 +1,71 @@
 """
-Testes de resources/Drivers/factory.py.
+Tests for resources/Drivers/factory.py.
 
-A leitura do parâmetro de task vive na fábrica, e não no execute.py, porque
-aquele módulo abre conexão com o banco em tempo de import — a regra ficaria
-fora do alcance da suíte unitária.
+Reading the task parameter lives in the factory, and not in execute.py, because
+that module opens a database connection at import time — the rule would be out
+of reach of the unit suite.
 """
 
 import pytest
 
 from resources.Drivers.factory import (
-    DRIVERS_DISPONIVEIS,
-    driver_dos_parametros,
-    resolver_driver,
+    AVAILABLE_DRIVERS,
+    driver_from_parameters,
+    resolve_driver,
 )
 
 
-def test_sem_parametros_devolve_none():
-    """Modo local: o BotExecution vem com parameters vazio."""
-    assert driver_dos_parametros({}) is None
+def test_no_parameters_returns_none():
+    """Local mode: BotExecution arrives with empty parameters."""
+    assert driver_from_parameters({}) is None
 
 
-def test_parametro_ausente_devolve_none():
-    assert driver_dos_parametros({'outra_coisa': 'valor'}) is None
+def test_missing_parameter_returns_none():
+    assert driver_from_parameters({'something_else': 'value'}) is None
 
 
-def test_parametro_vazio_devolve_none():
-    """Campo deixado em branco no painel não deve sobrepor o padrão."""
-    assert driver_dos_parametros({'driver': ''}) is None
+def test_empty_parameter_returns_none():
+    """A field left blank in the panel must not override the default."""
+    assert driver_from_parameters({'driver': ''}) is None
 
 
-@pytest.mark.parametrize('nome', DRIVERS_DISPONIVEIS)
-def test_devolve_cada_driver_disponivel(nome):
-    assert driver_dos_parametros({'driver': nome}) == nome
+@pytest.mark.parametrize('name', AVAILABLE_DRIVERS)
+def test_returns_each_available_driver(name):
+    assert driver_from_parameters({'driver': name}) == name
 
 
-def test_normaliza_espacos_e_maiusculas():
-    """Valor digitado à mão no painel do Maestro costuma vir sujo."""
-    assert driver_dos_parametros({'driver': '  SELENIUM '}) == 'selenium'
+def test_normalises_spaces_and_capitals():
+    """A value typed by hand in the Maestro panel usually arrives dirty."""
+    assert driver_from_parameters({'driver': '  SELENIUM '}) == 'selenium'
 
 
-def test_linha_de_comando_vence_o_parametro_da_task():
+def test_command_line_beats_the_task_parameter():
     """
-    A camada mais específica ganha: quem digitou a flag agora quis aquilo agora,
-    mesmo que a task tenha sido criada pedindo outra coisa.
+    The more specific layer wins: whoever typed the flag now wanted that now,
+    even if the task was created asking for something else.
     """
-    assert resolver_driver('playwright', {'driver': 'selenium'}) == 'playwright'
+    assert resolve_driver('playwright', {'driver': 'selenium'}) == 'playwright'
 
 
-def test_sem_linha_de_comando_vale_o_parametro_da_task():
-    assert resolver_driver(None, {'driver': 'selenium'}) == 'selenium'
+def test_without_command_line_the_task_parameter_holds():
+    assert resolve_driver(None, {'driver': 'selenium'}) == 'selenium'
 
 
-def test_sem_nenhum_dos_dois_devolve_none():
-    """None significa "decida pelo config.json" — a camada mais geral."""
-    assert resolver_driver(None, {}) is None
+def test_with_neither_of_them_returns_none():
+    """None means "decide from config.json" — the most general layer."""
+    assert resolve_driver(None, {}) is None
 
 
-def test_resolucao_rejeita_parametro_invalido_da_task():
+def test_resolution_rejects_an_invalid_task_parameter():
     with pytest.raises(ValueError, match='playwright, selenium'):
-        resolver_driver(None, {'driver': 'cypress'})
+        resolve_driver(None, {'driver': 'cypress'})
 
 
-def test_driver_desconhecido_levanta_erro_citando_os_validos():
+def test_unknown_driver_raises_an_error_naming_the_valid_ones():
     """
-    Falha na partida, antes de as migrações rodarem e de a execução ser
-    registrada no banco — um erro de digitação no painel não deve deixar
-    rastro de execução falhada.
+    It fails at launch, before the migrations run and before the run is
+    recorded in the database — a typo in the panel should leave no trace of a
+    failed run behind.
     """
     with pytest.raises(ValueError, match='playwright, selenium'):
-        driver_dos_parametros({'driver': 'cypress'})
+        driver_from_parameters({'driver': 'cypress'})

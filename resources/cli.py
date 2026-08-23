@@ -1,72 +1,72 @@
 """
-Leitura dos argumentos de linha de comando do robô.
+Reading the bot's command-line arguments.
 
-Mora fora do bot.py para que o ponto de entrada continue sendo só ponto de
-entrada, e para que esta lógica seja testável: importar o bot.py arrasta o
-orquestrador e, com ele, a conexão com o banco.
+It lives outside bot.py so that the entry point stays nothing but an entry
+point, and so that this logic is testable: importing bot.py drags in the
+orchestrator and, with it, the database connection.
 
-A separação segue o padrão do resto do projeto — separar_driver é função pura e
-concentra a regra; obter_driver_dos_argumentos é a casca fina que lê e reescreve
-o estado global.
+The split follows the pattern used everywhere else in the project —
+extract_driver is a pure function and holds the rule; driver_from_argv is the
+thin shell that reads and rewrites global state.
 """
 
 import argparse
 import sys
 
-from resources.Drivers.factory import DRIVERS_DISPONIVEIS
+from resources.Drivers.factory import AVAILABLE_DRIVERS
 
 
-def separar_driver(argv: list[str]) -> tuple[str | None, list[str]]:
+def extract_driver(argv: list[str]) -> tuple[str | None, list[str]]:
     """
-    Extrai --driver da linha de comando e devolve o que sobrou.
+    Extracts --driver from the command line and returns what was left.
 
-    Usa parse_known_args() e não parse_args() porque o robô também é disparado
-    pelo BotCity Maestro, que acrescenta argumentos próprios. O parse_args
-    encerraria o programa ao ver o primeiro argumento desconhecido — ou seja,
-    o robô morreria na largada sempre que o orquestrador o chamasse.
+    It uses parse_known_args() rather than parse_args() because the bot is also
+    fired by BotCity Maestro, which appends arguments of its own. parse_args
+    would end the program on seeing the first unknown argument — that is, the
+    bot would die at the gate every time the orchestrator called it.
 
     Args:
-        argv: Linha de comando completa, incluindo o nome do script na posição 0.
+        argv: The full command line, including the script name at position 0.
 
     Returns:
-        tuple[str | None, list[str]]: O driver pedido (None se ausente) e a
-            linha de comando sem os argumentos consumidos, com o nome do script
-            preservado na posição 0.
+        tuple[str | None, list[str]]: The requested driver (None if absent) and
+            the command line without the consumed arguments, with the script
+            name preserved at position 0.
 
     Raises:
-        SystemExit: Se --driver receber um valor fora de DRIVERS_DISPONIVEIS, ou
-            se --help for pedido. Comportamento padrão do argparse.
+        SystemExit: If --driver is given a value outside AVAILABLE_DRIVERS, or
+            if --help is requested. Standard argparse behaviour.
     """
     parser = argparse.ArgumentParser(
         prog='bot.py',
-        description='Executa o RPA Challenge.',
+        description='Runs the RPA Challenge.',
     )
     parser.add_argument(
         '--driver',
-        choices=DRIVERS_DISPONIVEIS,
-        help='Biblioteca que dirige o navegador. Padrão: DRIVER do config.json.',
+        choices=AVAILABLE_DRIVERS,
+        help='Library that drives the browser. Default: DRIVER from config.json.',
     )
 
-    argumentos, restante = parser.parse_known_args(argv[1:])
+    arguments, remaining = parser.parse_known_args(argv[1:])
 
-    return argumentos.driver, [argv[0], *restante]
+    return arguments.driver, [argv[0], *remaining]
 
 
-def obter_driver_dos_argumentos() -> str | None:
+def driver_from_argv() -> str | None:
     """
-    Lê --driver de sys.argv e o remove de lá.
+    Reads --driver from sys.argv and removes it from there.
 
-    A remoção não é cosmética. O BotMaestroSDK.from_sys_args() lê a linha de
-    comando **por posição**, desempacotando sys.argv[1:] como
-    (server, task_id, token, organization). Um argumento extra antes deles
-    desloca tudo: o robô tentaria se conectar a um servidor chamado '--driver'.
-    Retirar o que já foi consumido devolve ao SDK exatamente a linha que ele
-    espera, independentemente de onde o --driver tenha sido escrito.
+    The removal is not cosmetic. BotMaestroSDK.from_sys_args() reads the
+    command line **by position**, unpacking sys.argv[1:] as
+    (server, task_id, token, organization). One extra argument before them
+    shifts everything: the bot would try to connect to a server called
+    '--driver'. Taking out what has already been consumed hands the SDK exactly
+    the line it expects, no matter where --driver was typed.
 
     Returns:
-        str | None: Nome do driver, ou None se não foi informado.
+        str | None: The driver name, or None if it was not supplied.
     """
-    driver, restante = separar_driver(sys.argv)
-    sys.argv = restante
+    driver, remaining = extract_driver(sys.argv)
+    sys.argv = remaining
 
     return driver

@@ -1,10 +1,10 @@
 """
-Configurações do projeto e gerenciamento de credenciais criptografadas.
+Project settings and management of encrypted credentials.
 
-Este módulo expõe:
-- Settings: carrega e valida os campos do config.json via Pydantic.
-- get_settings(): fábrica com cache — ponto único de acesso às configurações.
-- Cryptography: lê e descriptografa credenciais armazenadas em secret/.
+This module exposes:
+- Settings: loads and validates the config.json fields through Pydantic.
+- get_settings(): a cached factory — the single point of access to the settings.
+- Cryptography: reads and decrypts the credentials stored in secret/.
 """
 
 from __future__ import annotations
@@ -19,47 +19,48 @@ from cryptography.fernet import Fernet
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Raiz do repositório: settings.py mora em resources/, então dois níveis acima.
+# Repository root: settings.py lives in resources/, so two levels up.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-VARIAVEL_DE_CONFIG = 'RPA_CHALLENGE_CONFIG'
+CONFIG_ENV_VAR = 'RPA_CHALLENGE_CONFIG'
 """
-Variável de ambiente que aponta onde está o config.json.
+Environment variable pointing at where config.json is.
 
-Existe para o caso em que o código roda de um diretório diferente daquele onde a
-configuração vive — que é exatamente o que um orquestrador faz. O runner do
-BotCity, por exemplo, extrai o pacote em `...\\BotCity\\run\\temp\\` e executa
-de lá; sem esta variável, a busca relativa ao código não acharia nada.
+It exists for the case where the code runs from a directory other than the one
+the configuration lives in — which is exactly what an orchestrator does. The
+BotCity runner, for instance, extracts the package into
+`...\\BotCity\\run\\temp\\` and runs from there; without this variable, a search
+relative to the code would find nothing.
 
-Não definida, a busca cai na raiz do repositório, e quem clona roda sem
-configurar nada.
+Left undefined, the search falls back to the repository root, and whoever
+clones the repo runs with nothing to configure.
 """
 
 
-def caminho_do_config() -> Path:
+def config_path() -> Path:
     """
-    Resolve onde procurar o config.json.
+    Resolves where to look for config.json.
 
-    A variável de ambiente aceita tanto a pasta quanto o arquivo — uma forma a
-    menos de errar na hora de configurar a máquina. A distinção é feita pela
-    extensão, e **não** consultando o disco: usar `is_dir()` faria o significado
-    do valor mudar conforme a pasta já existir ou não, e um caminho digitado
-    errado produziria mensagem de erro apontando para o lugar errado.
+    The environment variable accepts both the folder and the file — one fewer
+    way to get the machine setup wrong. The distinction is made by the
+    extension, and **not** by consulting the disk: using `is_dir()` would make
+    the value's meaning depend on whether the folder already exists, and a
+    mistyped path would produce an error message pointing at the wrong place.
 
     Returns:
-        Path: Caminho completo do arquivo de configuração.
+        Path: Full path of the configuration file.
     """
-    definido = os.getenv(VARIAVEL_DE_CONFIG)
-    if not definido:
+    defined = os.getenv(CONFIG_ENV_VAR)
+    if not defined:
         return _REPO_ROOT / 'config.json'
 
-    caminho = Path(definido)
+    path = Path(defined)
 
-    return caminho if caminho.suffix else caminho / 'config.json'
+    return path if path.suffix else path / 'config.json'
 
 
 class Settings(BaseSettings):
-    """Configurações do projeto carregadas e validadas a partir do config.json."""
+    """Project settings, loaded and validated from config.json."""
 
     model_config = SettingsConfigDict(extra='ignore')
 
@@ -68,29 +69,29 @@ class Settings(BaseSettings):
 
     PATH_URL: str
 
-    # Vazio significa "derive" — ver _derivar_caminhos. O valor do config.json
-    # sempre vence, o que mantém PATH_IN e PATH_OUT apontáveis para pastas de
-    # rede, como costumam ser em produção.
+    # Empty means "derive it" - see _derive_paths. The config.json value always
+    # wins, which keeps PATH_IN and PATH_OUT pointable at network folders, as
+    # they usually are in production.
     PATH_BASE: str = ''
     PATH_IN: str = ''
     PATH_OUT: str = ''
 
     @model_validator(mode='after')
-    def _derivar_caminhos(self) -> Settings:
+    def _derive_paths(self) -> Settings:
         """
-        Preenche os caminhos que o config.json não informou.
+        Fills in the paths config.json did not supply.
 
-        A derivação é encadeada, e a ordem importa: PATH_BASE primeiro, porque
-        PATH_IN e PATH_OUT pendem dele **já resolvido** — se o config declarar
-        um PATH_BASE, as pastas de entrada e saída acompanham.
+        The derivation is chained, and the order matters: PATH_BASE first,
+        because PATH_IN and PATH_OUT hang off it **already resolved** — if the
+        config declares a PATH_BASE, the input and output folders follow it.
 
-        PATH_BASE cai na pasta onde o config.json foi encontrado, e não na raiz
-        do repositório. É o que faz uma única variável de ambiente resolver
-        configuração, credenciais, logs e downloads de uma vez: secret/ e logs/
-        são vizinhos da **configuração**, não do código.
+        PATH_BASE falls back to the folder where config.json was found, not to
+        the repository root. That is what lets a single environment variable
+        resolve configuration, credentials, logs and downloads at once: secret/
+        and logs/ are neighbours of the **configuration**, not of the code.
         """
         if not self.PATH_BASE:
-            self.PATH_BASE = str(caminho_do_config().parent)
+            self.PATH_BASE = str(config_path().parent)
 
         if not self.PATH_IN:
             self.PATH_IN = str(Path(self.PATH_BASE) / 'Entrada')
@@ -101,27 +102,27 @@ class Settings(BaseSettings):
         return self
 
     DRIVER: str = 'playwright'
-    """Driver usado quando a linha de comando não especifica outro."""
+    """The driver used when the command line does not name another."""
 
     PATH_BROWSER: str = ''
     """
-    Executável do navegador, honrado pelos dois drivers.
+    Browser executable, honoured by both drivers.
 
-    Vazio significa deixar cada biblioteca usar o navegador que ela gerencia —
-    o Playwright, o Chromium próprio; o Selenium, o Chrome do sistema. O
-    benchmark exige este campo preenchido, porque comparar bibliotecas dirigindo
-    navegadores diferentes mede navegador, não biblioteca.
+    Empty means letting each library use the browser it manages — Playwright
+    its own Chromium, Selenium the system Chrome. The benchmark requires this
+    field to be filled, because comparing libraries that drive different
+    browsers measures the browser, not the library.
     """
 
     PATH_SELENIUM_DRIVER: str = ''
     """
-    Executável do chromedriver. Só o Selenium usa.
+    The chromedriver executable. Only Selenium uses it.
 
-    Vazio deixa o Selenium Manager baixar a versão correspondente ao navegador.
-    Só precisa ser preenchido em máquina sem saída para a internet.
+    Empty lets Selenium Manager download the version matching the browser. It
+    only needs a value on a machine with no internet access.
     """
 
-    # Conexão com o banco de dados PostgreSQL
+    # PostgreSQL database connection
     HOST_DB_POSTGRES: str
     PORT_DB_POSTGRES: int
     DB_NAME_POSTGRES: str
@@ -129,21 +130,21 @@ class Settings(BaseSettings):
 
     @property
     def PATH_LOGS(self) -> str:
-        """Retorna o caminho da pasta de logs, criando-a se não existir."""
+        """Returns the logs folder path, creating it if it does not exist."""
         path = Path(self.PATH_BASE) / 'logs'
         path.mkdir(parents=True, exist_ok=True)
         return str(path)
 
     @property
     def PATH_DOWNLOADS(self) -> str:
-        """Retorna o caminho da pasta de downloads, criando-a se não existir."""
+        """Returns the downloads folder path, creating it if it does not exist."""
         path = Path(self.PATH_BASE) / 'downloads'
         path.mkdir(parents=True, exist_ok=True)
         return str(path)
 
     @property
     def PATH_SECRETS(self) -> str:
-        """Retorna o caminho da pasta de segredos, criando-a se não existir."""
+        """Returns the secrets folder path, creating it if it does not exist."""
         path = Path(self.PATH_BASE) / 'secret'
         path.mkdir(parents=True, exist_ok=True)
         return str(path)
@@ -151,12 +152,12 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         """
-        Monta a URL de conexão com o PostgreSQL usando credenciais descriptografadas.
+        Assembles the PostgreSQL connection URL from decrypted credentials.
 
         Returns:
-            str: URL no formato postgresql+psycopg://usuario:senha@host:porta/banco.
+            str: A URL shaped as postgresql+psycopg://user:password@host:port/db.
         """
-        user_db, pass_db = Cryptography().ler_credenciais('db_credentials')
+        user_db, pass_db = Cryptography().read_credentials('db_credentials')
         return (
             f'postgresql+psycopg://{user_db}:'
             f'{pass_db}@{self.HOST_DB_POSTGRES}:'
@@ -172,19 +173,19 @@ class Settings(BaseSettings):
         dotenv_settings,
         file_secret_settings,
     ):
-        """Define o config.json como fonte principal de configuração."""
+        """Makes config.json the primary configuration source."""
 
         def json_config_settings_source() -> dict[str, Any]:
-            # O config.json NUNCA deve ser commitado: contém credenciais reais.
-            # O .gitignore já o bloqueia — use o config.example.json como modelo.
-            json_path = caminho_do_config()
+            # config.json must NEVER be committed: it holds real credentials.
+            # .gitignore already blocks it - use config.example.json as a model.
+            json_path = config_path()
 
             if not json_path.exists():
                 raise FileNotFoundError(
-                    f'Arquivo de configuração não encontrado em: {json_path}\n'
-                    'Copie config.example.json para config.json e preencha os '
-                    'valores, ou defina a variável de ambiente '
-                    f'{VARIAVEL_DE_CONFIG} apontando para onde ele está.'
+                    f'Configuration file not found at: {json_path}\n'
+                    'Copy config.example.json to config.json and fill in the '
+                    'values, or set the environment variable '
+                    f'{CONFIG_ENV_VAR} pointing at where it lives.'
                 )
 
             with json_path.open('r', encoding='utf-8-sig') as f:
@@ -201,125 +202,127 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """
-    Retorna a instância única de Settings, lendo o config.json uma só vez.
+    Returns the single Settings instance, reading config.json only once.
 
-    Todo o projeto deve obter as configurações por aqui, e não instanciando
-    Settings() diretamente. Isso evita reler o arquivo a cada chamada e
-    concentra num único ponto a supressão de tipo abaixo: os campos são
-    obrigatórios na classe, mas chegam do JSON em tempo de execução — o
-    type checker não enxerga essa fonte e acusa argumentos faltando.
+    The whole project should obtain the settings through here, rather than
+    instantiating Settings() directly. That avoids re-reading the file on every
+    call and concentrates the type suppression below in a single point: the
+    fields are required on the class but arrive from the JSON at runtime — the
+    type checker cannot see that source and reports missing arguments.
 
-    O cache pode ser descartado com ``get_settings.cache_clear()``, recurso
-    usado pelos testes para trocar o config.json por um de fixture.
+    The cache can be discarded with ``get_settings.cache_clear()``, which is
+    what the tests use to swap config.json for a fixture one.
 
     Returns:
-        Settings: Configurações validadas do projeto.
+        Settings: The project's validated settings.
     """
     return Settings()  # type: ignore[call-arg]
 
 
 class Cryptography:
     """
-    Gerenciamento de credenciais criptografadas com Fernet.
+    Management of Fernet-encrypted credentials.
 
-    As credenciais ficam em subpastas de secret/, nomeadas pelo sistema que protegem.
-    Cada subpasta contém credentials.json (campos 'email' e 'password') e secret.key.
+    The credentials live in subfolders of secret/, named after the system they
+    protect. Each subfolder holds credentials.json (fields 'email' and
+    'password') and secret.key.
 
-    Exemplo de estrutura::
+    Example layout::
 
         secret/
         └── db_credentials/
             ├── credentials.json
             └── secret.key
 
-    Exemplo de uso::
+    Example::
 
-        usuario, senha = Cryptography().ler_credenciais('db_credentials')
+        user, password = Cryptography().read_credentials('db_credentials')
     """
 
     def __init__(self, path_secrets: str | Path | None = None):
         """
-        Inicializa com o caminho base da pasta secret/.
+        Initialises with the base path of the secret/ folder.
 
         Args:
-            path_secrets: Pasta que contém as subpastas de credenciais. Omitido,
-                cai em get_settings().PATH_SECRETS — e **só nesse caso** o
-                config.json é lido, o que permite testar em uma pasta temporária
-                sem configuração real nem acesso ao secret/ da máquina.
+            path_secrets: Folder holding the credential subfolders. Omitted, it
+                falls back to get_settings().PATH_SECRETS — and **only in that
+                case** is config.json read, which allows testing against a
+                temporary folder with no real configuration and no access to
+                the machine's secret/.
         """
         self._path_secrets = path_secrets or get_settings().PATH_SECRETS
 
-    def __pegar_chave(self, credentials: str) -> bytes:
+    def __get_key(self, credentials: str) -> bytes:
         """
-        Carrega a chave de cifragem Fernet da subpasta indicada.
+        Loads the Fernet encryption key from the given subfolder.
 
         Args:
-            credentials: Nome da subpasta (ex: 'db_credentials').
+            credentials: Name of the subfolder (e.g. 'db_credentials').
 
         Returns:
-            bytes: Chave de cifragem em formato binário.
+            bytes: The encryption key in binary form.
 
         Raises:
-            FileNotFoundError: Se o arquivo secret.key não for encontrado.
+            FileNotFoundError: If the secret.key file is not found.
         """
         key_path = os.path.join(self._path_secrets, credentials, 'secret.key')
         try:
             with open(key_path, 'rb') as f:
                 return f.read()
         except FileNotFoundError:
-            raise FileNotFoundError(f'Chave não encontrada em: {key_path}')
+            raise FileNotFoundError(f'Key not found at: {key_path}')
 
     @staticmethod
-    def __descriptografar(valor_criptografado: str, key: bytes) -> str:
+    def __decrypt(encrypted_value: str, key: bytes) -> str:
         """
-        Descriptografa um valor usando a chave Fernet fornecida.
+        Decrypts a value using the supplied Fernet key.
 
         Args:
-            valor_criptografado: String criptografada em base64.
-            key: Chave Fernet em bytes.
+            encrypted_value: The encrypted string, in base64.
+            key: The Fernet key, in bytes.
 
         Returns:
-            str: Valor em texto claro.
+            str: The value in clear text.
 
         Raises:
-            SystemError: Se a descriptografia falhar.
+            SystemError: If decryption fails.
         """
         try:
-            return Fernet(key).decrypt(valor_criptografado.encode()).decode()
+            return Fernet(key).decrypt(encrypted_value.encode()).decode()
         except Exception as e:
-            raise SystemError(f'Erro ao descriptografar credencial: {e}')
+            raise SystemError(f'Error decrypting credential: {e}')
 
-    def ler_credenciais(self, credentials: str) -> tuple[str, str]:
+    def read_credentials(self, credentials: str) -> tuple[str, str]:
         """
-        Lê e descriptografa as credenciais de uma subpasta específica.
+        Reads and decrypts the credentials from a specific subfolder.
 
         Args:
-            credentials: Nome da subpasta dentro de secret/
-                (ex: 'db_credentials').
+            credentials: Name of the subfolder inside secret/
+                (e.g. 'db_credentials').
 
         Returns:
-            tuple[str, str]: (usuario, senha) em texto claro.
+            tuple[str, str]: (user, password) in clear text.
 
         Raises:
-            FileNotFoundError: Se credentials.json ou secret.key não forem encontrados.
-            SystemError: Se houver falha na descriptografia.
+            FileNotFoundError: If credentials.json or secret.key is not found.
+            SystemError: If decryption fails.
         """
         try:
             credentials_path = os.path.join(
                 self._path_secrets, credentials, 'credentials.json'
             )
-            key = self.__pegar_chave(credentials)
+            key = self.__get_key(credentials)
 
             with open(credentials_path, 'r', encoding='utf-8') as f:
                 creds = json.load(f)
 
-            usuario = self.__descriptografar(creds['email'], key)
-            senha = self.__descriptografar(creds['password'], key)
+            user = self.__decrypt(creds['email'], key)
+            password = self.__decrypt(creds['password'], key)
 
-            return usuario, senha
+            return user, password
         except FileNotFoundError as e:
-            raise FileNotFoundError(f'Arquivo de credenciais não encontrado: {e}')
+            raise FileNotFoundError(f'Credentials file not found: {e}')
         except SystemError:
             raise
         except Exception as e:
-            raise SystemError(f'Erro ao ler credenciais: {e}')
+            raise SystemError(f'Error reading credentials: {e}')

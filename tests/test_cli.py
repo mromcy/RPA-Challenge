@@ -1,77 +1,78 @@
 """
-Testes da leitura de argumentos de linha de comando (resources/cli.py).
+Tests for the command-line argument reading (resources/cli.py).
 
-O que estes testes protegem: o BotMaestroSDK.from_sys_args() lê a linha de
-comando **por posição**, desempacotando sys.argv[1:] como
-(server, task_id, token, organization). Qualquer argumento nosso deixado ali
-desloca as posições e faz o robô se conectar ao lugar errado.
+What these tests protect: BotMaestroSDK.from_sys_args() reads the command line
+**by position**, unpacking sys.argv[1:] as
+(server, task_id, token, organization). Any argument of ours left in there
+shifts the positions and makes the bot connect to the wrong place.
 """
 
 import sys
 
 import pytest
 
-from resources.cli import obter_driver_dos_argumentos, separar_driver
+from resources.cli import driver_from_argv, extract_driver
 
 MAESTRO = ['https://servidor.botcity', '12345', 'token-secreto', 'minha-org']
 
 
-def test_sem_driver_devolve_none_e_nao_altera_a_linha_de_comando():
+def test_no_driver_returns_none_and_leaves_the_command_line_alone():
     argv = ['bot.py', *MAESTRO]
 
-    driver, restante = separar_driver(argv)
+    driver, remaining = extract_driver(argv)
 
     assert driver is None
-    assert restante == argv
+    assert remaining == argv
 
 
-def test_driver_depois_dos_argumentos_do_maestro():
+def test_driver_after_the_maestro_arguments():
     argv = ['bot.py', *MAESTRO, '--driver', 'selenium']
 
-    driver, restante = separar_driver(argv)
+    driver, remaining = extract_driver(argv)
 
     assert driver == 'selenium'
-    assert restante == ['bot.py', *MAESTRO]
+    assert remaining == ['bot.py', *MAESTRO]
 
 
-def test_driver_antes_dos_argumentos_do_maestro_preserva_a_ordem():
+def test_driver_before_the_maestro_arguments_preserves_the_order():
     """
-    O caso que justifica a limpeza: sem remover o --driver, o SDK leria
-    server='--driver' e task_id='selenium'.
+    The case that justifies the cleanup: without removing --driver, the SDK
+    would read server='--driver' and task_id='selenium'.
     """
     argv = ['bot.py', '--driver', 'selenium', *MAESTRO]
 
-    driver, restante = separar_driver(argv)
+    driver, remaining = extract_driver(argv)
 
     assert driver == 'selenium'
-    assert restante == ['bot.py', *MAESTRO]
+    assert remaining == ['bot.py', *MAESTRO]
 
 
-def test_execucao_local_apenas_com_driver():
-    driver, restante = separar_driver(['bot.py', '--driver', 'playwright'])
+def test_local_run_with_the_driver_alone():
+    driver, remaining = extract_driver(['bot.py', '--driver', 'playwright'])
 
     assert driver == 'playwright'
-    assert restante == ['bot.py']
+    assert remaining == ['bot.py']
 
 
-def test_driver_desconhecido_encerra_com_erro():
+def test_an_unknown_driver_exits_with_an_error():
     with pytest.raises(SystemExit):
-        separar_driver(['bot.py', '--driver', 'cypress'])
+        extract_driver(['bot.py', '--driver', 'cypress'])
 
 
-def test_help_encerra_sem_executar_nada():
+def test_help_exits_without_running_anything():
     """
-    Com add_help desligado, --help viraria argumento desconhecido e o robô
-    executaria — abrindo navegador para quem só queria ler a ajuda.
+    With add_help turned off, --help would become an unknown argument and the
+    bot would run — opening a browser for someone who only wanted to read the
+    help.
     """
     with pytest.raises(SystemExit):
-        separar_driver(['bot.py', '--help'])
+        extract_driver(['bot.py', '--help'])
 
 
-def test_obter_driver_dos_argumentos_reescreve_o_sys_argv(monkeypatch):
+def test_driver_from_argv_rewrites_sys_argv(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['bot.py', '--driver', 'selenium', *MAESTRO])
 
-    driver = obter_driver_dos_argumentos()
+    driver = driver_from_argv()
 
     assert driver == 'selenium'
     assert sys.argv == ['bot.py', *MAESTRO]

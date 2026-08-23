@@ -1,8 +1,8 @@
 """
-Modelo Pydantic para representar a execução de processos.
+Pydantic model representing a process run.
 
-Este módulo define a estrutura de dados utilizada para representar
-as execuções de processos, incluindo status, horários e metadados.
+This module defines the data structure used to represent process runs,
+including status, timestamps and metadata.
 """
 
 from datetime import datetime, timedelta
@@ -13,23 +13,23 @@ from pydantic import BaseModel, ConfigDict
 
 class ProcessRun(BaseModel):
     """
-    Representa uma execução de processo automatizado.
+    Represents one run of an automated process.
 
-    Atributos:
-        run_id (int): Identificador único da execução.
-        process_name (str): Nome do processo executado.
-        resource_name (str): Nome do recurso responsável.
-        scheduled_by (str): Usuário ou sistema que agendou.
-        area (str): Área ou módulo do processo.
-        status (str): Status atual da execução.
-        latest_stage (str, opcional): Última etapa registrada.
-        stage_started_at (datetime, opcional): Início da última etapa.
-        started_at (datetime, opcional): Data/hora de início.
-        ended_at (datetime, opcional): Data/hora de término.
-        total_work_time (timedelta, opcional): Tempo total de execução.
-        error_message (str, opcional): Mensagem de erro, se houver.
-        error_stack (str, opcional): Stacktrace do erro, se aplicável.
-        metadata_ (dict, opcional): Metadados adicionais da execução.
+    Attributes:
+        run_id (int): Unique identifier of the run.
+        process_name (str): Name of the process that ran.
+        resource_name (str): Name of the resource responsible for it.
+        scheduled_by (str): User or system that scheduled it.
+        area (str): Area or module the process belongs to.
+        status (str): Current status of the run.
+        latest_stage (str, optional): Last stage recorded.
+        stage_started_at (datetime, optional): When the last stage began.
+        started_at (datetime, optional): Start date and time.
+        ended_at (datetime, optional): End date and time.
+        total_work_time (timedelta, optional): Total run time.
+        error_message (str, optional): Error message, if any.
+        error_stack (str, optional): Error stack trace, where applicable.
+        metadata_ (dict, optional): Additional metadata for the run.
     """
 
     model_config = ConfigDict(from_attributes=True)

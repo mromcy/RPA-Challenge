@@ -1,53 +1,53 @@
 """
-Dublê de navegador para os testes do fluxo de negócio.
+A browser stand-in for the business-flow tests.
 
-Não herda de BrowserDriver e não importa nada de resources: a conformidade com
-o Protocol é estrutural, e é justamente isso que permite o teste viver fora da
-hierarquia do código de produção.
+It does not inherit from BrowserDriver and imports nothing from resources:
+conformance to the Protocol is structural, and that is exactly what lets the
+test live outside the production code's hierarchy.
 
-Em vez de dirigir uma tela, registra as chamadas recebidas — o que transforma
-"o robô preencheu os sete campos com os valores certos" numa asserção de
-dicionário, sem navegador, em milissegundos.
+Instead of driving a screen, it records the calls it receives — which turns
+"the bot filled the seven fields with the right values" into a dictionary
+assertion, with no browser, in milliseconds.
 """
 
-RESULTADO_PADRAO = 'Your success rate is 100% ( 70 out of 70 fields) in 678 milliseconds'
+DEFAULT_RESULT = 'Your success rate is 100% ( 70 out of 70 fields) in 678 milliseconds'
 
 
 class FakeDriver:
-    """Implementação de BrowserDriver que grava o que foi pedido."""
+    """A BrowserDriver implementation that records what it was asked to do."""
 
-    nome = 'fake'
+    name = 'fake'
 
-    def __init__(self, resultado: str = RESULTADO_PADRAO):
+    def __init__(self, result: str = DEFAULT_RESULT):
         """
         Args:
-            resultado: Texto que ler_resultado() devolverá.
+            result: The text read_result() will return.
         """
-        self.chamadas: list[tuple] = []
-        self.campos_preenchidos: dict[str, str] = {}
-        self._resultado = resultado
+        self.calls: list[tuple] = []
+        self.filled_fields: dict[str, str] = {}
+        self._result = result
 
     @property
-    def operacoes(self) -> list[str]:
-        """Só os nomes das operações, na ordem — para asserções de sequência."""
-        return [chamada[0] for chamada in self.chamadas]
+    def operations(self) -> list[str]:
+        """Only the operation names, in order — for sequence assertions."""
+        return [call[0] for call in self.calls]
 
-    def abrir(self, url: str) -> None:
-        self.chamadas.append(('abrir', url))
+    def open(self, url: str) -> None:
+        self.calls.append(('open', url))
 
-    def clicar_iniciar(self) -> None:
-        self.chamadas.append(('clicar_iniciar',))
+    def click_start(self) -> None:
+        self.calls.append(('click_start',))
 
-    def preencher_campo(self, rotulo: str, valor: str) -> None:
-        self.chamadas.append(('preencher_campo', rotulo, valor))
-        self.campos_preenchidos[rotulo] = valor
+    def fill_field(self, label: str, value: str) -> None:
+        self.calls.append(('fill_field', label, value))
+        self.filled_fields[label] = value
 
-    def enviar(self) -> None:
-        self.chamadas.append(('enviar',))
+    def submit(self) -> None:
+        self.calls.append(('submit',))
 
-    def ler_resultado(self) -> str:
-        self.chamadas.append(('ler_resultado',))
-        return self._resultado
+    def read_result(self) -> str:
+        self.calls.append(('read_result',))
+        return self._result
 
-    def fechar(self) -> None:
-        self.chamadas.append(('fechar',))
+    def close(self) -> None:
+        self.calls.append(('close',))

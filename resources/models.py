@@ -1,17 +1,18 @@
 """
-Modelos ORM e enums de status do projeto.
+The project's ORM models and status enums.
 
-ATENÇÃO: importar este módulo abre conexão com o banco de dados.
+WARNING: importing this module opens a database connection.
 
-A tabela process_manager.process_run pertence a outro sistema e é refletida do banco
-(autoload_with=engine) em vez de declarada aqui — manter uma cópia local da definição
-de um schema compartilhado é como o drift entre as automações começa. O preço dessa
-escolha é que a reflexão acontece no import.
+The process_manager.process_run table belongs to another system and is
+reflected from the database (autoload_with=engine) instead of being declared
+here — keeping a local copy of a shared schema's definition is how drift
+between automations begins. The price of that choice is that the reflection
+happens at import time.
 
-Consequência prática: resources.models e tudo que o importa (Utils/operation_db e
-execute) exigem um PostgreSQL acessível. Os demais módulos do projeto — settings,
-logs, ler_arquivo, Schemas e Modules — importam sem banco nenhum, e é por isso que
-os testes unitários conseguem cobri-los.
+The practical consequence: resources.models and everything that imports it
+(Utils/operation_db and execute) require a reachable PostgreSQL. The project's
+other modules — settings, logs, read_file, Schemas and Modules — import with no
+database at all, and that is why the unit tests can cover them.
 """
 
 import enum
@@ -31,38 +32,41 @@ external_md = MetaData(schema='process_manager')
 table_registry = registry()
 
 
-def _verificar_process_run_existe() -> None:
+def _ensure_process_run_exists() -> None:
     """
-    Garante que a tabela central process_manager.process_run existe antes de refleti-la.
+    Makes sure the central process_manager.process_run table exists before it
+    is reflected.
 
-    A process_run é uma dependência CENTRAL, compartilhada por várias automações e
-    provisionada externamente (fora das migrations deste projeto). Por isso ela é
-    refletida do banco, não criada aqui — criar uma tabela compartilhada a partir de
-    cada bot levaria a drift de schema e race conditions.
+    process_run is a CENTRAL dependency, shared by several automations and
+    provisioned externally (outside this project's migrations). That is why it
+    is reflected from the database rather than created here — creating a shared
+    table from each bot would lead to schema drift and race conditions.
 
-    Esta verificação existe apenas para falhar rápido com uma mensagem clara caso o
-    ambiente ainda não tenha sido provisionado, em vez de um NoSuchTableError cru.
+    This check exists only to fail fast with a clear message if the environment
+    has not been provisioned yet, instead of a raw NoSuchTableError.
     """
     insp = inspect(engine)
     if 'process_manager' not in insp.get_schema_names():
         raise RuntimeError(
-            "Schema 'process_manager' não encontrado no banco de dados.\n"
-            "A tabela central 'process_manager.process_run' é uma dependência "
-            'compartilhada entre as automações e deve ser provisionada previamente '
-            '(fora deste projeto). Crie o schema e a tabela no ambiente antes de '
-            'executar a automação.'
+            "Schema 'process_manager' not found in the database.\n"
+            "The central table 'process_manager.process_run' is a dependency "
+            'shared between the automations and must be provisioned in advance '
+            '(outside this project). Create the schema and the table in the '
+            'environment before running the automation.'
         )
     if not insp.has_table('process_run', schema='process_manager'):
         raise RuntimeError(
-            "Tabela 'process_manager.process_run' não encontrada.\n"
-            'Ela é uma dependência central compartilhada entre as automações e deve '
-            'ser criada previamente (fora deste projeto). Verifique também se o '
-            'usuário do banco tem permissão de leitura no schema process_manager.'
+            "Table 'process_manager.process_run' not found.\n"
+            'It is a central dependency shared between the automations and must '
+            'be created in advance (outside this project). Check as well that '
+            'the database user has read permission on the process_manager '
+            'schema.'
         )
 
 
-# Falha cedo e com mensagem clara se a dependência central não estiver provisionada
-_verificar_process_run_existe()
+# Fail early, and with a clear message, if the central dependency has not been
+# provisioned
+_ensure_process_run_exists()
 
 process_run_tbl = Table(
     'process_run',

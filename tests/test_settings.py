@@ -1,15 +1,14 @@
 """
-Testes de resources/settings.py — classe Settings.
+Tests for resources/settings.py — the Settings class.
 
-Estes testes cobrem dois caminhos que **nunca rodam na máquina do Marco**: os
-valores padrão de PATH_BASE/PATH_IN/PATH_OUT (o config.json dele preenche
-PATH_IN e PATH_OUT) e a resolução do config.json pela raiz do repositório (o
-dele sempre existe). Ambos só são exercitados por quem clona — e pelo CI.
+These tests cover two paths that **never run on Marco's machine**: the default
+values of PATH_BASE/PATH_IN/PATH_OUT (his config.json fills PATH_IN and
+PATH_OUT) and resolving config.json from the repository root (his always
+exists). Both are only exercised by whoever clones the repo — and by CI.
 
-O truque é neutralizar as duas metades de caminho_do_config(): apagar a variável
-de ambiente e trocar _REPO_ROOT por uma pasta temporária. O loader consulta as
-duas no momento da chamada, então o Settings passa a procurar o config.json
-dentro de tmp_path.
+The trick is to neutralise both halves of config_path(): delete the environment
+variable and swap _REPO_ROOT for a temporary folder. The loader consults both
+at call time, so Settings starts looking for config.json inside tmp_path.
 """
 
 import json
@@ -17,12 +16,12 @@ from pathlib import Path
 
 import pytest
 
-from resources import settings as modulo_settings
-from resources.settings import VARIAVEL_DE_CONFIG, Settings, caminho_do_config
+from resources import settings as settings_module
+from resources.settings import CONFIG_ENV_VAR, Settings, config_path
 
-RAIZ_REPO = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
-CONFIG_MINIMO = {
+MINIMAL_CONFIG = {
     'PROJECT_NAME': 'projeto_de_teste',
     'AREA': 'area_de_teste',
     'PATH_URL': 'https://exemplo.invalido/desafio',
@@ -34,149 +33,150 @@ CONFIG_MINIMO = {
 
 
 @pytest.fixture
-def raiz_falsa(tmp_path, monkeypatch):
+def fake_root(tmp_path, monkeypatch):
     """
-    Faz o loader do config.json procurar dentro de tmp_path.
+    Makes the config.json loader look inside tmp_path.
 
-    Apagar a variável de ambiente não é zelo extra, é a outra metade do trabalho:
-    caminho_do_config() consulta RPA_CHALLENGE_CONFIG **antes** de cair no
-    _REPO_ROOT, e trocar só a raiz deixaria viva a metade que vence. Numa máquina
-    onde a variável está definida — a do Marco, por causa do runner do BotCity —
-    o Settings leria o config.json real, e estes testes afirmariam sobre a
-    configuração da máquina em vez da que a fixture acabou de escrever.
+    Deleting the environment variable is not extra care, it is the other half
+    of the job: config_path() consults RPA_CHALLENGE_CONFIG **before** falling
+    back to _REPO_ROOT, and swapping only the root would leave the winning half
+    alive. On a machine where the variable is set — Marco's, because of the
+    BotCity runner — Settings would read the real config.json, and these tests
+    would be asserting about the machine's configuration instead of the one the
+    fixture just wrote.
     """
-    monkeypatch.delenv(VARIAVEL_DE_CONFIG, raising=False)
-    monkeypatch.setattr(modulo_settings, '_REPO_ROOT', tmp_path)
+    monkeypatch.delenv(CONFIG_ENV_VAR, raising=False)
+    monkeypatch.setattr(settings_module, '_REPO_ROOT', tmp_path)
     return tmp_path
 
 
-def _escrever_config(pasta: Path, **extras) -> None:
-    (pasta / 'config.json').write_text(
-        json.dumps({**CONFIG_MINIMO, **extras}), encoding='utf-8'
+def _write_config(folder: Path, **extras) -> None:
+    (folder / 'config.json').write_text(
+        json.dumps({**MINIMAL_CONFIG, **extras}), encoding='utf-8'
     )
 
 
-def test_sem_a_variavel_o_config_e_procurado_na_raiz_do_repositorio(monkeypatch):
-    monkeypatch.delenv(VARIAVEL_DE_CONFIG, raising=False)
+def test_without_the_variable_the_config_is_looked_for_in_the_repo_root(monkeypatch):
+    monkeypatch.delenv(CONFIG_ENV_VAR, raising=False)
 
-    assert caminho_do_config() == RAIZ_REPO / 'config.json'
-
-
-def test_variavel_aceita_a_pasta(tmp_path, monkeypatch):
-    monkeypatch.setenv(VARIAVEL_DE_CONFIG, str(tmp_path))
-
-    assert caminho_do_config() == tmp_path / 'config.json'
+    assert config_path() == REPO_ROOT / 'config.json'
 
 
-def test_variavel_aceita_o_arquivo(tmp_path, monkeypatch):
-    alvo = tmp_path / 'outro_nome.json'
-    alvo.touch()
-    monkeypatch.setenv(VARIAVEL_DE_CONFIG, str(alvo))
+def test_the_variable_accepts_the_folder(tmp_path, monkeypatch):
+    monkeypatch.setenv(CONFIG_ENV_VAR, str(tmp_path))
 
-    assert caminho_do_config() == alvo
+    assert config_path() == tmp_path / 'config.json'
 
 
-def test_pasta_inexistente_ainda_e_tratada_como_pasta(tmp_path, monkeypatch):
+def test_the_variable_accepts_the_file(tmp_path, monkeypatch):
+    target = tmp_path / 'another_name.json'
+    target.touch()
+    monkeypatch.setenv(CONFIG_ENV_VAR, str(target))
+
+    assert config_path() == target
+
+
+def test_a_missing_folder_is_still_treated_as_a_folder(tmp_path, monkeypatch):
     """
-    A distinção é pela extensão, não por consultar o disco. Com `is_dir()`, um
-    caminho de pasta ainda não criada seria lido como nome de arquivo, e a
-    mensagem de erro apontaria para o lugar errado — o usuário procuraria o
-    problema onde ele não está.
+    The distinction is made by extension, not by consulting the disk. With
+    `is_dir()`, the path of a folder not yet created would be read as a file
+    name, and the error message would point at the wrong place — the user would
+    look for the problem where it is not.
 
-    A pasta sai do tmp_path e **nunca é criada** — existir no disco é justamente
-    o que não pode importar aqui. O caminho é nativo de propósito: um literal de
-    Windows faria o teste afirmar o separador da máquina que o roda, e não o
-    contrato do código.
+    The folder comes from tmp_path and is **never created** — existing on disk
+    is precisely what must not matter here. The path is native on purpose: a
+    Windows literal would make the test assert the separator of the machine
+    running it, rather than the code's contract.
     """
-    pasta_nunca_criada = tmp_path / 'pasta' / 'que' / 'nao' / 'existe'
-    monkeypatch.setenv(VARIAVEL_DE_CONFIG, str(pasta_nunca_criada))
+    never_created_folder = tmp_path / 'folder' / 'that' / 'does' / 'not' / 'exist'
+    monkeypatch.setenv(CONFIG_ENV_VAR, str(never_created_folder))
 
-    assert not pasta_nunca_criada.exists()
-    assert caminho_do_config() == pasta_nunca_criada / 'config.json'
+    assert not never_created_folder.exists()
+    assert config_path() == never_created_folder / 'config.json'
 
 
-def test_path_base_padrao_e_a_pasta_do_config(raiz_falsa):
+def test_the_default_path_base_is_the_config_folder(fake_root):
     """
-    Ancorar no config, e não na raiz do repositório, é o que faz uma única
-    variável de ambiente resolver credenciais, logs e downloads junto — eles
-    são vizinhos da configuração, não do código.
+    Anchoring on the config, and not on the repository root, is what lets a
+    single environment variable resolve credentials, logs and downloads
+    together — they are neighbours of the configuration, not of the code.
     """
-    _escrever_config(raiz_falsa)
+    _write_config(fake_root)
 
     settings = Settings()  # type: ignore[call-arg]
 
-    assert settings.PATH_BASE == str(raiz_falsa)
+    assert settings.PATH_BASE == str(fake_root)
 
 
-def test_entrada_e_saida_derivam_do_path_base(raiz_falsa):
-    """O caso de quem clona: config.json sem PATH_IN nem PATH_OUT."""
-    _escrever_config(raiz_falsa)
-
-    settings = Settings()  # type: ignore[call-arg]
-
-    assert settings.PATH_IN == str(raiz_falsa / 'Entrada')
-    assert settings.PATH_OUT == str(raiz_falsa / 'Saida')
-
-
-def test_entrada_e_saida_acompanham_o_path_base_declarado(raiz_falsa):
-    """
-    A derivação é encadeada: declarar só PATH_BASE reposiciona as duas pastas,
-    sem precisar repetir os caminhos.
-    """
-    outra_base = raiz_falsa / 'robos' / 'rpa_challenge'
-    _escrever_config(raiz_falsa, PATH_BASE=str(outra_base))
+def test_input_and_output_derive_from_path_base(fake_root):
+    """The case of whoever clones: a config.json with no PATH_IN or PATH_OUT."""
+    _write_config(fake_root)
 
     settings = Settings()  # type: ignore[call-arg]
 
-    assert settings.PATH_IN == str(outra_base / 'Entrada')
-    assert settings.PATH_OUT == str(outra_base / 'Saida')
+    assert settings.PATH_IN == str(fake_root / 'Entrada')
+    assert settings.PATH_OUT == str(fake_root / 'Saida')
 
 
-def test_config_json_vence_o_padrao(raiz_falsa):
-    """A capacidade que motivou manter as chaves: apontar para pasta de rede."""
-    _escrever_config(raiz_falsa, PATH_IN=r'\\servidor\setor\entrada')
+def test_input_and_output_follow_a_declared_path_base(fake_root):
+    """
+    The derivation is chained: declaring PATH_BASE alone repositions both
+    folders, with no need to repeat the paths.
+    """
+    other_base = fake_root / 'robos' / 'rpa_challenge'
+    _write_config(fake_root, PATH_BASE=str(other_base))
+
+    settings = Settings()  # type: ignore[call-arg]
+
+    assert settings.PATH_IN == str(other_base / 'Entrada')
+    assert settings.PATH_OUT == str(other_base / 'Saida')
+
+
+def test_config_json_beats_the_default(fake_root):
+    """The capability that justified keeping the keys: a network folder."""
+    _write_config(fake_root, PATH_IN=r'\\servidor\setor\entrada')
 
     settings = Settings()  # type: ignore[call-arg]
 
     assert settings.PATH_IN == r'\\servidor\setor\entrada'
-    assert settings.PATH_OUT == str(raiz_falsa / 'Saida')
+    assert settings.PATH_OUT == str(fake_root / 'Saida')
 
 
-def test_config_json_ausente_levanta_erro_explicativo(raiz_falsa):
-    """Sem config.json, a mensagem precisa dizer o que fazer — não estourar um
-    erro de validação do Pydantic listando dez campos faltando."""
+def test_a_missing_config_json_raises_an_explanatory_error(fake_root):
+    """With no config.json, the message has to say what to do — not blow up
+    with a Pydantic validation error listing ten missing fields."""
     with pytest.raises(FileNotFoundError, match='config.example.json'):
         Settings()  # type: ignore[call-arg]
 
 
-def test_pastas_derivadas_pendem_de_path_base(raiz_falsa):
-    _escrever_config(raiz_falsa, PATH_BASE=str(raiz_falsa))
+def test_the_derived_folders_hang_off_path_base(fake_root):
+    _write_config(fake_root, PATH_BASE=str(fake_root))
 
     settings = Settings()  # type: ignore[call-arg]
 
-    assert settings.PATH_LOGS == str(raiz_falsa / 'logs')
-    assert settings.PATH_DOWNLOADS == str(raiz_falsa / 'downloads')
-    assert settings.PATH_SECRETS == str(raiz_falsa / 'secret')
+    assert settings.PATH_LOGS == str(fake_root / 'logs')
+    assert settings.PATH_DOWNLOADS == str(fake_root / 'downloads')
+    assert settings.PATH_SECRETS == str(fake_root / 'secret')
 
 
-def test_pastas_derivadas_sao_criadas_ao_serem_acessadas(raiz_falsa):
-    _escrever_config(raiz_falsa, PATH_BASE=str(raiz_falsa))
+def test_the_derived_folders_are_created_when_accessed(fake_root):
+    _write_config(fake_root, PATH_BASE=str(fake_root))
 
     settings = Settings()  # type: ignore[call-arg]
 
-    assert not (raiz_falsa / 'logs').exists()
+    assert not (fake_root / 'logs').exists()
 
-    caminho = settings.PATH_LOGS
+    path = settings.PATH_LOGS
 
-    assert Path(caminho).is_dir()
+    assert Path(path).is_dir()
 
 
-def test_chaves_desconhecidas_no_config_json_sao_ignoradas(raiz_falsa):
+def test_unknown_keys_in_config_json_are_ignored(fake_root):
     """
-    É o `extra='ignore'` que deixa PATH_DRIVER conviver no config.json do Marco
-    sem ter dono no Settings, e que fez o passo 2 não exigir edição do arquivo.
+    It is `extra='ignore'` that lets PATH_DRIVER live on in Marco's config.json
+    with no owner in Settings, and that made step 2 require no edit to the file.
     """
-    _escrever_config(raiz_falsa, CHAVE_QUE_NAO_EXISTE='valor')
+    _write_config(fake_root, KEY_THAT_DOES_NOT_EXIST='value')
 
     settings = Settings()  # type: ignore[call-arg]
 

@@ -1,7 +1,7 @@
 """
-Fixtures compartilhadas por toda a suíte.
+Fixtures shared by the whole suite.
 
-O pytest carrega este arquivo automaticamente — nenhum teste precisa importá-lo.
+pytest loads this file automatically — no test needs to import it.
 """
 
 import pytest
@@ -10,15 +10,16 @@ from resources.settings import get_settings
 
 
 @pytest.fixture(autouse=True)
-def _config_limpa():
+def _clean_config():
     """
-    Zera o cache de configuração antes e depois de cada teste.
+    Clears the settings cache before and after every test.
 
-    get_settings() é memoizado com @lru_cache, ou seja, estado global mutável.
-    Sem esta limpeza, um teste que leia o config.json real deixa a configuração
-    da máquina disponível para os testes seguintes, e o resultado da suíte passa
-    a depender da ordem de execução — a categoria de falha mais difícil de
-    diagnosticar. Nenhum teste herda a máquina de quem rodou antes dele.
+    get_settings() is memoised with @lru_cache, which is to say it is mutable
+    global state. Without this cleanup, a test that reads the real config.json
+    leaves the machine's configuration available to the tests that follow, and
+    the suite's result starts depending on execution order — the hardest class
+    of failure to diagnose. No test inherits the machine from whoever ran
+    before it.
     """
     get_settings.cache_clear()
     yield

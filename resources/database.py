@@ -1,9 +1,10 @@
 """
-Configuração do engine SQLAlchemy e gerenciamento de sessões.
+SQLAlchemy engine configuration and session management.
 
-Este módulo expõe:
-- engine: instância global do SQLAlchemy Engine conectada ao PostgreSQL.
-- get_session(): context manager que abre, commita e fecha sessões de forma segura.
+This module exposes:
+- engine: the project-wide SQLAlchemy Engine connected to PostgreSQL.
+- get_session(): a context manager that opens, commits and closes sessions
+  safely.
 """
 
 from contextlib import contextmanager
@@ -13,22 +14,23 @@ from sqlalchemy.orm import Session
 
 from resources.settings import get_settings
 
-# Engine compartilhado por todo o projeto.
-# pool_pre_ping=True evita erros silenciosos com conexões stale após idle longo.
+# Engine shared by the whole project.
+# pool_pre_ping=True avoids silent errors from stale connections after a long
+# idle period.
 engine = create_engine(
     get_settings().DATABASE_URL,
     connect_args={
         'connect_timeout': 10,
-        # Força o timezone do servidor para America/Fortaleza em todas as sessões
+        # Forces the server timezone to America/Fortaleza on every session
         'options': '-c timezone=America/Fortaleza',
     },
-    # Tempo máximo para obter uma conexão do pool (segundos)
+    # Maximum time to obtain a connection from the pool (seconds)
     pool_timeout=30,
-    # Recicla conexões após 30 min para evitar conexões mortas
+    # Recycle connections after 30 min to avoid dead ones
     pool_recycle=1800,
-    # Conexões mantidas abertas simultaneamente no pool
+    # Connections kept open simultaneously in the pool
     pool_size=10,
-    # Conexões extras permitidas além do pool_size em pico de carga
+    # Extra connections allowed beyond pool_size at peak load
     max_overflow=20,
     pool_pre_ping=True,
 )
@@ -37,12 +39,12 @@ engine = create_engine(
 @contextmanager
 def get_session():
     """
-    Context manager para sessões de banco de dados.
+    Context manager for database sessions.
 
-    Commita automaticamente ao sair do bloco com sucesso.
-    Faz rollback e re-lança a exceção em caso de erro.
+    Commits automatically when the block exits successfully.
+    Rolls back and re-raises the exception on error.
 
-    Exemplo de uso::
+    Example::
 
         with get_session() as session:
             session.add(obj)
@@ -50,7 +52,7 @@ def get_session():
             id_ = obj.id
 
     Yields:
-        Session: Sessão SQLAlchemy pronta para uso.
+        Session: A SQLAlchemy session ready to use.
     """
     session = Session(engine)
     try:

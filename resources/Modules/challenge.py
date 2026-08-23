@@ -1,15 +1,15 @@
 """
-1 - Fluxo de negócio do RPA Challenge.
-2 - Fala com o navegador exclusivamente pelo contrato BrowserDriver.
-3 - Não importa Playwright nem Selenium: qual biblioteca dirige a tela é
-    decisão de quem monta o driver, e este módulo não precisa saber.
+1 - Business flow of the RPA Challenge.
+2 - Talks to the browser exclusively through the BrowserDriver contract.
+3 - Imports neither Playwright nor Selenium: which library drives the screen is
+    a decision for whoever assembles the driver, and this module need not know.
 """
 
 from resources.Drivers.base import BrowserDriver
 from resources.Schemas.item_run import Item
 from resources.Tools.logs import Logs
 
-CAMPOS_DO_FORMULARIO = {
+FORM_FIELDS = {
     'First Name': 'First_Name',
     'Last Name': 'Last_Name',
     'Company Name': 'Company_Name',
@@ -19,67 +19,70 @@ CAMPOS_DO_FORMULARIO = {
     'Phone Number': 'Phone_Number',
 }
 """
-Rótulo exibido na tela → atributo correspondente em Item.
+Label shown on screen → matching attribute on Item.
 
-Mapa de dados, e não sete chamadas escritas à mão: acrescentar um campo ao
-formulário passa a ser uma linha aqui, sem tocar em nenhum driver. Os rótulos
-são os que o desafio realmente exibe, e é por eles que os campos são
-localizados — o site embaralha a ordem a cada rodada.
+A data map, rather than seven hand-written calls: adding a field to the form
+becomes one line here, with no driver touched. The labels are the ones the
+challenge actually displays, and they are what the fields are located by — the
+site shuffles their order on every round.
 """
 
 
 class Challenge:
-    """Executa o fluxo do RPA Challenge sobre qualquer BrowserDriver."""
+    """Runs the RPA Challenge flow over any BrowserDriver."""
 
     def __init__(self, driver: BrowserDriver, logs: Logs) -> None:
         """
         Args:
-            driver: Implementação de BrowserDriver já construída.
-            logs: Instância de Logs para registro das operações.
+            driver: An already built BrowserDriver implementation.
+            logs: Logs instance used to record the operations.
         """
         self.driver = driver
         self.logs = logs
 
-    def iniciar_desafio(self, url: str) -> None:
+    def start_challenge(self, url: str) -> None:
         """
-        Navega para a URL do desafio e clica em 'Start'.
+        Navigates to the challenge URL and clicks 'Start'.
 
-        Deve ser chamado uma única vez antes do preenchimento dos formulários.
+        Must be called exactly once before any form is filled.
 
         Args:
-            url: URL do sistema a ser acessado, proveniente das configurações.
+            url: URL of the system to reach, coming from the settings.
         """
-        self.logs.info(f'Navegando para o RPA Challenge com o driver {self.driver.nome}.')
-        self.driver.abrir(url)
-        self.driver.clicar_iniciar()
-        self.logs.info('Desafio iniciado com sucesso.')
+        self.logs.info(
+            f'Navigating to the RPA Challenge with the {self.driver.name} driver.'
+        )
+        self.driver.open(url)
+        self.driver.click_start()
+        self.logs.info('Challenge started successfully.')
 
-    def preencher_formulario(self, item: Item) -> None:
+    def fill_form(self, item: Item) -> None:
         """
-        Preenche todos os campos do formulário e envia.
+        Fills every field of the form and submits it.
 
         Args:
-            item: Schema Pydantic com os dados do registro atual,
-                  lido da tabela item via get_queued_items_by_run.
+            item: Pydantic schema holding the current record's data, read from
+                  the item table through get_queued_items_by_run.
         """
-        self.logs.info(f'Preenchendo formulário: {item.First_Name} {item.Last_Name}.')
+        self.logs.info(f'Filling form: {item.First_Name} {item.Last_Name}.')
 
-        for rotulo, atributo in CAMPOS_DO_FORMULARIO.items():
-            self.driver.preencher_campo(rotulo, getattr(item, atributo))
+        for label, attribute in FORM_FIELDS.items():
+            self.driver.fill_field(label, getattr(item, attribute))
 
-        self.driver.enviar()
+        self.driver.submit()
 
-    def capturar_resultado(self) -> str:
+    def capture_result(self) -> str:
         """
-        Devolve o texto do resultado final exibido após o último envio.
+        Returns the text of the final result shown after the last submission.
 
-        A espera pelo elemento é responsabilidade do driver, garantida pelo
-        contrato — por isso o retorno é str, e não str | None como antes.
+        Waiting for the element is the driver's responsibility, guaranteed by
+        the contract — which is why the return type is str, and no longer
+        str | None as it used to be.
 
         Returns:
-            str: Texto do resultado, ex.: 'Your success rate is 100% ...'.
+            str: The result text, e.g. 'Your success rate is 100% ...'.
         """
-        resultado = self.driver.ler_resultado()
-        self.logs.info(resultado)
+        result = self.driver.read_result()
+        self.logs.info(result)
 
-        return resultado
+        return result

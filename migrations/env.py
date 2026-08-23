@@ -33,18 +33,18 @@ target_metadata = table_registry.metadata
 
 
 def create_schemas_if_not_exists(engine, schema_name:str) ->None:
-    # O `closing` fecha cada recurso mesmo quando a linha seguinte falha. Antes,
-    # o cursor era criado dentro do try e fechado no finally: se `.cursor()`
-    # estourasse — conexão invalidada no pool, por exemplo — o finally rodava
-    # com o nome inexistente e o NameError substituía o erro de verdade, ainda
-    # deixando a conexão aberta.
+    # `closing` shuts each resource down even when the next line fails. Before,
+    # the cursor was created inside the try and closed in the finally: if
+    # `.cursor()` blew up - a connection invalidated in the pool, say - the
+    # finally ran with a name that never existed, and the NameError replaced the
+    # real error while still leaving the connection open.
     with (
         closing(engine.raw_connection()) as raw_connection,
         closing(raw_connection.cursor()) as cursor,
     ):
         cursor.execute(f'CREATE SCHEMA IF NOT EXISTS {schema_name}')
         raw_connection.commit()
-    print(f'Schema {schema_name} verificado ou criado')    
+    print(f'Schema {schema_name} checked or created')    
     
 
 

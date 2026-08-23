@@ -1,12 +1,12 @@
 {
     "PROJECT_NAME": "rpa_challenge",
-    "AREA": "Hiperautomação",
+    "AREA": "Hyperautomation",
     "PATH_URL": "https://rpachallenge.com/",
     "DRIVER": "playwright",
     "PATH_BROWSER": "",
     "PATH_SELENIUM_DRIVER": "",
     "HOST_DB_POSTGRES": "localhost",
     "PORT_DB_POSTGRES": 5432,
-    "DB_NAME_POSTGRES": "<nome_do_banco>",
+    "DB_NAME_POSTGRES": "<database_name>",
     "DB_SCHEMA": "rpa_challenge"
 }

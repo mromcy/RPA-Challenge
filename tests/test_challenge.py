@@ -1,10 +1,11 @@
 """
-Testes do fluxo de negócio (resources/Modules/challenge.py).
+Tests for the business flow (resources/Modules/challenge.py).
 
-Rodam sem navegador: o Challenge fala com um BrowserDriver, e nos testes esse
-driver é o FakeDriver, que apenas registra o que foi pedido. É o ganho que
-justifica a inversão de dependência do P2 — antes deste bloco, challenge.py
-tinha 0% de cobertura porque não havia como exercitá-lo sem subir um browser.
+They run with no browser: Challenge talks to a BrowserDriver, and in the tests
+that driver is FakeDriver, which only records what it was asked to do. This is
+the gain that justifies P2's dependency inversion — before this block,
+challenge.py had 0% coverage because there was no way to exercise it without
+starting a browser.
 """
 
 import subprocess
@@ -14,16 +15,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from resources.Modules.challenge import CAMPOS_DO_FORMULARIO, Challenge
+from resources.Modules.challenge import FORM_FIELDS, Challenge
 from resources.Schemas.item_run import Item
-from tests.fake_driver import RESULTADO_PADRAO, FakeDriver
+from tests.fake_driver import DEFAULT_RESULT, FakeDriver
 
 URL = 'https://rpachallenge.com/'
 
 
-def _item(**sobrescritas) -> Item:
-    """Item com os sete campos preenchidos, sobrescrevíveis por nome."""
-    valores = {
+def _item(**overrides) -> Item:
+    """An Item with all seven fields filled, overridable by name."""
+    values = {
         'id': 1,
         'item_id': 1,
         'First_Name': 'Marco',
@@ -34,7 +35,7 @@ def _item(**sobrescritas) -> Item:
         'Email': 'teste@exemplo.invalido',
         'Phone_Number': '5511999999999',
     }
-    return Item(**{**valores, **sobrescritas})
+    return Item(**{**values, **overrides})
 
 
 @pytest.fixture
@@ -47,16 +48,16 @@ def challenge(driver):
     return Challenge(driver, MagicMock())
 
 
-def test_iniciar_desafio_navega_e_depois_clica_em_start(challenge, driver):
-    challenge.iniciar_desafio(URL)
+def test_start_challenge_navigates_and_then_clicks_start(challenge, driver):
+    challenge.start_challenge(URL)
 
-    assert driver.chamadas == [('abrir', URL), ('clicar_iniciar',)]
+    assert driver.calls == [('open', URL), ('click_start',)]
 
 
-def test_preencher_formulario_preenche_os_sete_campos(challenge, driver):
-    challenge.preencher_formulario(_item())
+def test_fill_form_fills_the_seven_fields(challenge, driver):
+    challenge.fill_form(_item())
 
-    assert driver.campos_preenchidos == {
+    assert driver.filled_fields == {
         'First Name': 'Marco',
         'Last Name': 'Romcy',
         'Company Name': 'Empresa Ficticia',
@@ -67,72 +68,72 @@ def test_preencher_formulario_preenche_os_sete_campos(challenge, driver):
     }
 
 
-def test_preencher_formulario_envia_depois_de_preencher_tudo(challenge, driver):
-    """O envio precisa ser a última operação: enviar no meio perde campos."""
-    challenge.preencher_formulario(_item())
+def test_fill_form_submits_after_filling_everything(challenge, driver):
+    """Submitting must be the last operation: submitting mid-way loses fields."""
+    challenge.fill_form(_item())
 
-    preenchimentos = ['preencher_campo'] * len(CAMPOS_DO_FORMULARIO)
-    assert driver.operacoes == [*preenchimentos, 'enviar']
-
-
-def test_preencher_formulario_envia_uma_vez_por_item(challenge, driver):
-    itens = [_item(First_Name='Ana'), _item(First_Name='Bruno')]
-
-    for item in itens:
-        challenge.preencher_formulario(item)
-
-    assert driver.operacoes.count('enviar') == len(itens)
+    fills = ['fill_field'] * len(FORM_FIELDS)
+    assert driver.operations == [*fills, 'submit']
 
 
-def test_preencher_formulario_usa_os_valores_do_item_recebido(challenge, driver):
-    challenge.preencher_formulario(_item(First_Name='Ana', Email='ana@exemplo.invalido'))
+def test_fill_form_submits_once_per_item(challenge, driver):
+    items = [_item(First_Name='Ana'), _item(First_Name='Bruno')]
 
-    assert driver.campos_preenchidos['First Name'] == 'Ana'
-    assert driver.campos_preenchidos['Email'] == 'ana@exemplo.invalido'
+    for item in items:
+        challenge.fill_form(item)
 
-
-def test_capturar_resultado_devolve_o_texto_lido_pelo_driver(challenge):
-    assert challenge.capturar_resultado() == RESULTADO_PADRAO
+    assert driver.operations.count('submit') == len(items)
 
 
-def test_capturar_resultado_nao_devolve_none():
+def test_fill_form_uses_the_values_of_the_item_it_received(challenge, driver):
+    challenge.fill_form(_item(First_Name='Ana', Email='ana@exemplo.invalido'))
+
+    assert driver.filled_fields['First Name'] == 'Ana'
+    assert driver.filled_fields['Email'] == 'ana@exemplo.invalido'
+
+
+def test_capture_result_returns_the_text_read_by_the_driver(challenge):
+    assert challenge.capture_result() == DEFAULT_RESULT
+
+
+def test_capture_result_does_not_return_none():
     """
-    O contrato promete str. O capturar_resultado anterior devolvia str | None
-    porque lia sem esperar — esta trava impede a volta do None.
+    The contract promises str. The earlier capture_result returned str | None
+    because it read without waiting — this guard stops None from coming back.
     """
-    challenge = Challenge(FakeDriver(resultado=''), MagicMock())
+    challenge = Challenge(FakeDriver(result=''), MagicMock())
 
-    assert isinstance(challenge.capturar_resultado(), str)
+    assert isinstance(challenge.capture_result(), str)
 
 
-def test_mapa_de_campos_cobre_todos_os_campos_de_formulario_do_item():
+def test_field_map_covers_every_form_field_of_item():
     """
-    Trava de sincronia: se alguém acrescentar um campo de formulário ao Item e
-    esquecer do mapa, o robô passaria a enviar o formulário incompleto sem erro
-    nenhum — o site simplesmente pontuaria menos.
+    Synchronisation guard: if somebody adds a form field to Item and forgets
+    the map, the bot would start submitting an incomplete form with no error at
+    all — the site would simply score lower.
     """
-    nao_sao_campos_de_formulario = {'id', 'item_id', 'result'}
-    campos_do_item = set(Item.model_fields) - nao_sao_campos_de_formulario
+    not_form_fields = {'id', 'item_id', 'result'}
+    item_fields = set(Item.model_fields) - not_form_fields
 
-    assert set(CAMPOS_DO_FORMULARIO.values()) == campos_do_item
+    assert set(FORM_FIELDS.values()) == item_fields
 
 
-def test_fluxo_de_negocio_nao_depende_de_biblioteca_de_navegador():
+def test_business_flow_does_not_depend_on_a_browser_library():
     """
-    Trava de arquitetura do P2: importar o fluxo não pode carregar Playwright
-    nem Selenium. Roda em subprocesso porque, no processo do pytest, outro
-    teste pode já ter importado a biblioteca por outro caminho.
+    P2's architecture guard: importing the flow must load neither Playwright
+    nor Selenium. It runs in a subprocess because, inside the pytest process,
+    another test may already have imported the library by another route.
     """
-    codigo = (
+    code = (
         'import sys; import resources.Modules.challenge; '
         "print([m for m in sys.modules if 'playwright' in m or 'selenium' in m])"
     )
-    resultado = subprocess.run(
-        [sys.executable, '-c', codigo],
+    result = subprocess.run(
+        [sys.executable, '-c', code],
         cwd=Path(__file__).resolve().parents[1],
         capture_output=True,
         text=True,
         check=True,
     )
 
-    assert resultado.stdout.strip() == '[]'
+    assert result.stdout.strip() == '[]'

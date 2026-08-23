@@ -10,21 +10,22 @@ from resources.settings import get_settings
 
 class Logs:
     """
-    Logger que escreve em console e em arquivo, e encaminha erros ao BotCity
-    Maestro quando a execução tem task_id.
+    Logger that writes to the console and to a file, and forwards errors to
+    BotCity Maestro when the run has a task_id.
 
-    O gancho de persistência em banco (_save_log_to_db) ainda é um stub sem efeito.
+    The database persistence hook (_save_log_to_db) is still a stub with no
+    effect.
 
-    Parâmetros:
-        maestro (BotMaestroSDK): SDK usado para reportar erros ao Maestro
-            quando a execução não é local.
-        logger_name (str): Nome do logger configurado
+    Parameters:
+        maestro (BotMaestroSDK): SDK used to report errors to Maestro when the
+            run is not local.
+        logger_name (str): Name of the configured logger
             (default: 'RPA').
-        log_level (int): Nível mínimo de captura de logs
+        log_level (int): Minimum level captured
             (default: logging.INFO).
-        configure_handler (bool): Se True, adiciona handlers
-            de console e arquivo (default: True).
-        logger (Logger): Instância de Logger pré-configurada (opcional).
+        configure_handler (bool): If True, adds console and file handlers
+            (default: True).
+        logger (Logger): A pre-configured Logger instance (optional).
     """
 
     def __init__(
@@ -81,11 +82,11 @@ class Logs:
         self._logger.warning(message, *args, **kwargs)
         self._save_log_to_db('WARNING', message)
 
-    def error(self, erro, *args, **kwargs):
-        msg = str(erro)
+    def error(self, error, *args, **kwargs):
+        msg = str(error)
         self._logger.error(msg, *args, **kwargs)
         self._save_log_to_db('ERROR', msg)
-        self._save_log_to_botcity(erro)
+        self._save_log_to_botcity(error)
 
     def exception(self, message, *args, **kwargs):
         self._logger.exception(message, *args, **kwargs)

@@ -1,19 +1,19 @@
 """
-Testes de ponta a ponta contra o rpachallenge.com ao vivo.
+End-to-end tests against the live rpachallenge.com.
 
-Uma suíte só, dois backends de navegador, o mesmo assert — é literalmente o que
-se faz em teste cross-browser.
+One suite, two browser backends, the same assertion — literally what
+cross-browser testing is.
 
-Ficam fora do lane rápido pelo marker `e2e`, porque dependem de sistema externo:
-o site pode sair do ar, mudar o DOM ou oscilar de rede. Falha aqui nem sempre
-significa defeito no código, e CI vermelho por motivo alheio ensina o time a
-ignorar o vermelho.
+They stay out of the fast lane through the `e2e` marker, because they depend on
+an external system: the site can go down, change its DOM or suffer network
+jitter. A failure here does not always mean a defect in the code, and a CI that
+goes red for someone else's reason teaches a team to ignore red.
 
-Os drivers são construídos **diretamente**, e não pela fábrica: a fábrica
-aplicaria o PATH_BROWSER do config.json, e com ele preenchido os dois drivers
-passariam a usar o mesmo navegador — exatamente a cobertura cross-browser que
-estes testes existem para dar (decisão 12 do progresso). Como efeito colateral
-útil, a suíte roda sem config.json algum.
+The drivers are built **directly**, not through the factory: the factory would
+apply PATH_BROWSER from config.json, and with it filled both drivers would end
+up using the same browser — exactly the cross-browser coverage these tests
+exist to give (decision 12 in the progress notes). As a useful side effect, the
+suite runs with no config.json at all.
 """
 
 from pathlib import Path
@@ -23,14 +23,14 @@ import pytest
 
 from resources.Drivers.playwright_driver import PlaywrightDriver
 from resources.Drivers.selenium_driver import SeleniumDriver
-from resources.Modules.challenge import CAMPOS_DO_FORMULARIO, Challenge
+from resources.Modules.challenge import FORM_FIELDS, Challenge
 from resources.Schemas.item_run import Item
-from resources.Utils.ler_arquivo import LerArquivo
+from resources.Utils.read_file import FileReader
 
 URL = 'https://rpachallenge.com/'
-PASTA_DE_ENTRADA = Path(__file__).resolve().parents[1] / 'Entrada'
+INPUT_FOLDER = Path(__file__).resolve().parents[1] / 'Entrada'
 
-CONSTRUTORES = {
+CONSTRUCTORS = {
     'playwright': PlaywrightDriver,
     'selenium': SeleniumDriver,
 }
@@ -39,60 +39,58 @@ CONSTRUTORES = {
 @pytest.fixture
 def driver(request):
     """
-    Instancia o driver pedido em headless e garante fechar() no teardown.
+    Instantiates the requested driver headless and guarantees close() on
+    teardown.
 
-    O que vem depois do yield roda mesmo quando o teste falha, o que impede um
-    navegador ficar pendurado na memória quando o site muda ou cai.
+    What comes after the yield runs even when the test fails, which stops a
+    browser being left hanging in memory when the site changes or goes down.
     """
-    instancia = CONSTRUTORES[request.param](headless=True)
+    instance = CONSTRUCTORS[request.param](headless=True)
 
-    yield instancia
+    yield instance
 
-    instancia.fechar()
+    instance.close()
 
 
 @pytest.fixture(scope='module')
-def itens() -> list[Item]:
+def items() -> list[Item]:
     """
-    Os dez registros de Entrada/challenge.xlsx, no formato que o fluxo consome.
+    The ten records of Entrada/challenge.xlsx, in the shape the flow consumes.
 
-    Reaproveita LerArquivo e limpar_dataframe em vez de reimplementar a leitura:
-    é o mesmo caminho que a produção percorre, então uma quebra ali aparece
-    aqui também. Escopo de módulo porque o arquivo não muda entre os testes.
+    It reuses FileReader and clean_dataframe instead of reimplementing the
+    reading: it is the same path production walks, so a break there shows up
+    here too. Module scope because the file does not change between tests.
     """
-    dados = LerArquivo(MagicMock(), path_in=PASTA_DE_ENTRADA).ler_arquivo()
+    data = FileReader(MagicMock(), path_in=INPUT_FOLDER).read_file()
 
     return [
         Item(
-            id=numero,
-            item_id=numero,
-            **{
-                atributo: str(linha[rotulo])
-                for rotulo, atributo in CAMPOS_DO_FORMULARIO.items()
-            },
+            id=number,
+            item_id=number,
+            **{attribute: str(row[label]) for label, attribute in FORM_FIELDS.items()},
         )
-        for numero, (_, linha) in enumerate(dados.iterrows(), 1)
+        for number, (_, row) in enumerate(data.iterrows(), 1)
     ]
 
 
 @pytest.mark.e2e
-@pytest.mark.parametrize('driver', CONSTRUTORES, indirect=True)
-def test_desafio_completo_com_sucesso_total(driver, itens):
+@pytest.mark.parametrize('driver', CONSTRUCTORS, indirect=True)
+def test_full_challenge_with_a_perfect_score(driver, items):
     """
-    O fluxo inteiro, do zero ao resultado, no navegador de verdade.
+    The whole flow, from zero to result, in a real browser.
 
-    O `indirect=True` faz o valor do parametrize chegar à fixture `driver` em
-    vez de ao teste: cada nome vira uma instância diferente, e o corpo do teste
-    não sabe qual biblioteca está do outro lado — que é a prova de que a
-    abstração funciona.
+    `indirect=True` makes the parametrize value reach the `driver` fixture
+    rather than the test: each name becomes a different instance, and the body
+    of the test does not know which library is on the other side — which is the
+    proof that the abstraction works.
     """
     challenge = Challenge(driver, MagicMock())
 
-    challenge.iniciar_desafio(URL)
-    for item in itens:
-        challenge.preencher_formulario(item)
+    challenge.start_challenge(URL)
+    for item in items:
+        challenge.fill_form(item)
 
-    resultado = challenge.capturar_resultado()
+    result = challenge.capture_result()
 
-    assert '100%' in resultado, f'Driver {driver.nome} não zerou o desafio: {resultado}'
-    assert '70 out of 70' in resultado
+    assert '100%' in result, f'Driver {driver.name} did not ace the challenge: {result}'
+    assert '70 out of 70' in result

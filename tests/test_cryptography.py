@@ -1,9 +1,9 @@
 """
-Testes de resources/settings.py — classe Cryptography.
+Tests for resources/settings.py — the Cryptography class.
 
-Nenhuma credencial real é usada: cada teste gera a própria chave Fernet e grava
-o cofre em tmp_path. O path_secrets injetável é o que permite apontar a classe
-para lá em vez do secret/ da máquina.
+No real credential is used: each test generates its own Fernet key and writes
+the vault into tmp_path. The injectable path_secrets is what allows pointing
+the class there instead of at the machine's secret/.
 """
 
 import json
@@ -14,122 +14,125 @@ from cryptography.fernet import Fernet
 
 from resources.settings import Cryptography, get_settings
 
-USUARIO = 'usuario_de_mentira'
-SENHA = 'senha_de_mentira'
+USER = 'usuario_de_mentira'
+PASSWORD = 'senha_de_mentira'
 
 
 @pytest.fixture
-def cofre(tmp_path):
+def vault(tmp_path):
     """
-    Fábrica de cofres Fernet dentro de tmp_path.
+    A factory of Fernet vaults inside tmp_path.
 
-    Devolve uma função em vez de uma pasta pronta para que cada teste possa
-    montar quantas variações precisar — com outra chave, sem o secret.key,
-    sem o credentials.json — sem duplicar a montagem.
+    It returns a function instead of a ready-made folder so that each test can
+    assemble as many variations as it needs — with a different key, without
+    secret.key, without credentials.json — without duplicating the setup.
     """
 
-    def _montar(
-        subpasta: str = 'db_credentials',
+    def _build(
+        subfolder: str = 'db_credentials',
         *,
-        usuario: str = USUARIO,
-        com_chave: bool = True,
-        com_credenciais: bool = True,
+        user: str = USER,
+        with_key: bool = True,
+        with_credentials: bool = True,
     ) -> Path:
-        pasta = tmp_path / subpasta
-        pasta.mkdir(parents=True, exist_ok=True)
+        folder = tmp_path / subfolder
+        folder.mkdir(parents=True, exist_ok=True)
         key = Fernet.generate_key()
 
-        if com_chave:
-            (pasta / 'secret.key').write_bytes(key)
+        if with_key:
+            (folder / 'secret.key').write_bytes(key)
 
-        if com_credenciais:
+        if with_credentials:
             fernet = Fernet(key)
-            (pasta / 'credentials.json').write_text(
+            (folder / 'credentials.json').write_text(
                 json.dumps({
-                    'email': fernet.encrypt(usuario.encode()).decode(),
-                    'password': fernet.encrypt(SENHA.encode()).decode(),
+                    'email': fernet.encrypt(user.encode()).decode(),
+                    'password': fernet.encrypt(PASSWORD.encode()).decode(),
                 }),
                 encoding='utf-8',
             )
 
-        return pasta
+        return folder
 
-    return _montar
+    return _build
 
 
-def test_ler_credenciais_devolve_os_valores_originais(tmp_path, cofre):
+def test_read_credentials_returns_the_original_values(tmp_path, vault):
     """
-    Teste de ida e volta: não afirma um valor cifrado fixo, afirma a propriedade
-    de que descriptografar desfaz criptografar. Por isso nenhum segredo real
-    precisa existir.
+    A round-trip test: it does not assert a fixed encrypted value, it asserts
+    the property that decrypting undoes encrypting. That is why no real secret
+    needs to exist.
     """
-    cofre()
+    vault()
 
-    usuario, senha = Cryptography(path_secrets=tmp_path).ler_credenciais('db_credentials')
+    user, password = Cryptography(path_secrets=tmp_path).read_credentials(
+        'db_credentials'
+    )
 
-    assert (usuario, senha) == (USUARIO, SENHA)
-
-
-def test_ler_credenciais_isola_subpastas_diferentes(tmp_path, cofre):
-    cofre(subpasta='db_credentials', usuario='usuario_banco')
-    cofre(subpasta='api_credentials', usuario='usuario_api')
-
-    cripto = Cryptography(path_secrets=tmp_path)
-
-    assert cripto.ler_credenciais('db_credentials')[0] == 'usuario_banco'
-    assert cripto.ler_credenciais('api_credentials')[0] == 'usuario_api'
+    assert (user, password) == (USER, PASSWORD)
 
 
-def test_ler_credenciais_levanta_erro_sem_o_secret_key(tmp_path, cofre):
-    cofre(com_chave=False)
+def test_read_credentials_keeps_different_subfolders_apart(tmp_path, vault):
+    vault(subfolder='db_credentials', user='usuario_banco')
+    vault(subfolder='api_credentials', user='usuario_api')
 
-    with pytest.raises(FileNotFoundError, match='Chave não encontrada'):
-        Cryptography(path_secrets=tmp_path).ler_credenciais('db_credentials')
+    crypto = Cryptography(path_secrets=tmp_path)
 
-
-def test_ler_credenciais_levanta_erro_sem_o_credentials_json(tmp_path, cofre):
-    cofre(com_credenciais=False)
-
-    with pytest.raises(FileNotFoundError, match='Arquivo de credenciais'):
-        Cryptography(path_secrets=tmp_path).ler_credenciais('db_credentials')
+    assert crypto.read_credentials('db_credentials')[0] == 'usuario_banco'
+    assert crypto.read_credentials('api_credentials')[0] == 'usuario_api'
 
 
-def test_ler_credenciais_levanta_erro_com_chave_trocada(tmp_path, cofre):
-    """Cofre válido, mas o secret.key é sobrescrito por outra chave Fernet."""
-    pasta = cofre()
-    (pasta / 'secret.key').write_bytes(Fernet.generate_key())
+def test_read_credentials_raises_without_the_secret_key(tmp_path, vault):
+    vault(with_key=False)
 
-    with pytest.raises(SystemError, match='Erro ao descriptografar'):
-        Cryptography(path_secrets=tmp_path).ler_credenciais('db_credentials')
+    with pytest.raises(FileNotFoundError, match='Key not found'):
+        Cryptography(path_secrets=tmp_path).read_credentials('db_credentials')
 
 
-def test_ler_credenciais_levanta_erro_com_credentials_json_invalido(tmp_path, cofre):
+def test_read_credentials_raises_without_the_credentials_json(tmp_path, vault):
+    vault(with_credentials=False)
+
+    with pytest.raises(FileNotFoundError, match='Credentials file not found'):
+        Cryptography(path_secrets=tmp_path).read_credentials('db_credentials')
+
+
+def test_read_credentials_raises_with_a_swapped_key(tmp_path, vault):
+    """A valid vault, but secret.key is overwritten with another Fernet key."""
+    folder = vault()
+    (folder / 'secret.key').write_bytes(Fernet.generate_key())
+
+    with pytest.raises(SystemError, match='Error decrypting'):
+        Cryptography(path_secrets=tmp_path).read_credentials('db_credentials')
+
+
+def test_read_credentials_raises_with_an_invalid_credentials_json(tmp_path, vault):
     """
-    Arquivo editado à mão e salvo quebrado. O json.JSONDecodeError não é nem
-    FileNotFoundError nem SystemError, então cai no `except Exception` final —
-    que era o último trecho de ler_credenciais sem cobertura.
+    A file edited by hand and saved broken. json.JSONDecodeError is neither
+    FileNotFoundError nor SystemError, so it lands in the final
+    `except Exception` — which was the last stretch of read_credentials without
+    coverage.
     """
-    pasta = cofre()
-    (pasta / 'credentials.json').write_text('isto não é json', encoding='utf-8')
+    folder = vault()
+    (folder / 'credentials.json').write_text('this is not json', encoding='utf-8')
 
-    with pytest.raises(SystemError, match='Erro ao ler credenciais'):
-        Cryptography(path_secrets=tmp_path).ler_credenciais('db_credentials')
+    with pytest.raises(SystemError, match='Error reading credentials'):
+        Cryptography(path_secrets=tmp_path).read_credentials('db_credentials')
 
 
-def test_ler_credenciais_levanta_erro_para_subpasta_inexistente(tmp_path, cofre):
-    cofre()
+def test_read_credentials_raises_for_a_missing_subfolder(tmp_path, vault):
+    vault()
 
     with pytest.raises(FileNotFoundError):
-        Cryptography(path_secrets=tmp_path).ler_credenciais('nao_existe')
+        Cryptography(path_secrets=tmp_path).read_credentials('nao_existe')
 
 
-def test_path_secrets_injetado_nao_le_o_config_json(tmp_path, cofre):
+def test_an_injected_path_secrets_does_not_read_config_json(tmp_path, vault):
     """
-    Trava da costura criada no passo 3: com path_secrets preenchido, o `or` faz
-    curto-circuito e get_settings() nunca é chamado.
+    A guard on the seam created in step 3: with path_secrets filled, the `or`
+    short-circuits and get_settings() is never called.
     """
-    cofre()
+    vault()
 
-    Cryptography(path_secrets=tmp_path).ler_credenciais('db_credentials')
+    Cryptography(path_secrets=tmp_path).read_credentials('db_credentials')
 
     assert get_settings.cache_info().misses == 0

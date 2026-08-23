@@ -1,40 +1,43 @@
 """
-Implementação do BrowserDriver sobre o Playwright.
+BrowserDriver implementation on top of Playwright.
 
-Todo o conhecimento de Playwright do projeto fica confinado aqui: fora deste
-arquivo ninguém importa `playwright`, e por isso o fluxo de negócio pode ser
-testado sem navegador.
+All of the project's Playwright knowledge is confined here: outside this file
+nobody imports `playwright`, and that is why the business flow can be tested
+with no browser.
 """
 
 from typing import Any
 
 from playwright.sync_api import Browser, Page, Playwright, sync_playwright
 
-from resources.Drivers import seletores
-from resources.Drivers.base import TIMEOUT_PADRAO_MS
+from resources.Drivers import selectors
+from resources.Drivers.base import DEFAULT_TIMEOUT_MS
 
 
 class PlaywrightDriver:
     """
-    Dirige o RPA Challenge com o Playwright.
+    Drives the RPA Challenge with Playwright.
 
-    Não herda de BrowserDriver: a conformidade com o Protocol é estrutural.
+    It does not inherit from BrowserDriver: conformance to the Protocol is
+    structural.
 
-    O navegador só sobe na primeira chamada a abrir(), e não no __init__, para
-    que construir o driver seja barato e não deixe processo pendurado se algo
-    falhar antes do uso.
+    The browser only starts on the first call to open(), not in __init__, so
+    that building the driver is cheap and leaves no process hanging if
+    something fails before it is used.
     """
 
-    nome = 'playwright'
+    name = 'playwright'
 
     def __init__(self, headless: bool = True, path_browser: str = ''):
         """
         Args:
-            headless: Sem janela visível. Padrão do robô e do benchmark.
-            path_browser: Executável do navegador. Vazio significa usar o
-                Chromium que o próprio Playwright gerencia — ver decisão 10 do
-                progresso. Não é lido das configurações aqui de propósito: quem
-                monta o driver é que decide, o que mantém a classe testável.
+            headless: No visible window. The default for the bot and for the
+                benchmark.
+            path_browser: Browser executable. Empty means use the Chromium
+                Playwright manages itself — see decision 10 in the progress
+                notes. It is deliberately not read from the settings here: the
+                caller assembling the driver decides, which keeps the class
+                testable.
         """
         self._headless = headless
         self._path_browser = path_browser
@@ -43,33 +46,31 @@ class PlaywrightDriver:
         self._page: Page | None = None
 
     @property
-    def _pagina(self) -> Page:
+    def _active_page(self) -> Page:
         """
-        Página ativa, com erro explícito se o driver não foi aberto.
+        The active page, with an explicit error if the driver was never opened.
 
-        Sem isso, usar o driver fora de ordem produziria um AttributeError em
-        None, que não diz o que fazer.
+        Without this, using the driver out of order would produce an
+        AttributeError on None, which does not say what to do about it.
         """
         if self._page is None:
-            raise RuntimeError(
-                'Driver do Playwright não iniciado: chame abrir(url) antes.'
-            )
+            raise RuntimeError('Playwright driver not started: call open(url) first.')
         return self._page
 
-    def abrir(self, url: str) -> None:
-        """Sobe o navegador na primeira chamada e navega até a URL."""
+    def open(self, url: str) -> None:
+        """Starts the browser on the first call and navigates to the URL."""
         if self._page is None:
             self._playwright = sync_playwright().start()
 
-            # Argumento omitido — e não vazio — quando não há executável
-            # apontado: string vazia faria o Playwright tentar executá-la.
+            # The argument is omitted - not left empty - when no executable is
+            # pointed at: an empty string would make Playwright try to run it.
             extras: dict[str, Any] = {}
             if self._path_browser:
                 extras['executable_path'] = self._path_browser
 
             if not self._headless:
-                # Execução acompanhada pelo operador: janela ocupando a tela,
-                # como no comportamento anterior ao driver.
+                # A run watched by the operator: window filling the screen,
+                # as it behaved before the driver existed.
                 extras['args'] = ['--start-maximized']
 
             self._browser = self._playwright.chromium.launch(
@@ -77,44 +78,44 @@ class PlaywrightDriver:
             )
             self._page = self._browser.new_page(no_viewport=not self._headless)
 
-        self._pagina.goto(url, timeout=TIMEOUT_PADRAO_MS)
+        self._active_page.goto(url, timeout=DEFAULT_TIMEOUT_MS)
 
-    def clicar_iniciar(self) -> None:
-        """Clica em 'Start'."""
-        self._pagina.locator(seletores.XPATH_BOTAO_INICIAR).click(
-            timeout=TIMEOUT_PADRAO_MS
+    def click_start(self) -> None:
+        """Clicks 'Start'."""
+        self._active_page.locator(selectors.XPATH_START_BUTTON).click(
+            timeout=DEFAULT_TIMEOUT_MS
         )
 
-    def preencher_campo(self, rotulo: str, valor: str) -> None:
-        """Preenche o campo cujo rótulo visível é `rotulo`."""
-        seletor = seletores.XPATH_CAMPO_POR_ROTULO.format(rotulo=rotulo)
-        self._pagina.locator(seletor).fill(valor, timeout=TIMEOUT_PADRAO_MS)
+    def fill_field(self, label: str, value: str) -> None:
+        """Fills the field whose visible label is `label`."""
+        selector = selectors.XPATH_FIELD_BY_LABEL.format(label=label)
+        self._active_page.locator(selector).fill(value, timeout=DEFAULT_TIMEOUT_MS)
 
-    def enviar(self) -> None:
-        """Clica em 'Submit'."""
-        self._pagina.locator(seletores.XPATH_BOTAO_ENVIAR).click(
-            timeout=TIMEOUT_PADRAO_MS
+    def submit(self) -> None:
+        """Clicks 'Submit'."""
+        self._active_page.locator(selectors.XPATH_SUBMIT_BUTTON).click(
+            timeout=DEFAULT_TIMEOUT_MS
         )
 
-    def ler_resultado(self) -> str:
+    def read_result(self) -> str:
         """
-        Espera a mensagem final ficar visível e devolve o texto.
+        Waits for the closing message to become visible and returns its text.
 
-        A espera é explícita porque o contrato promete `str`: ler antes de o
-        site renderizar devolveria vazio, que era a fonte de instabilidade do
-        capturar_resultado anterior.
+        The wait is explicit because the contract promises `str`: reading
+        before the site renders would return an empty string, which was the
+        source of instability in the earlier capture_result.
         """
-        localizador = self._pagina.locator(seletores.XPATH_RESULTADO).first
-        localizador.wait_for(state='visible', timeout=TIMEOUT_PADRAO_MS)
-        return localizador.inner_text()
+        locator = self._active_page.locator(selectors.XPATH_RESULT).first
+        locator.wait_for(state='visible', timeout=DEFAULT_TIMEOUT_MS)
+        return locator.inner_text()
 
-    def fechar(self) -> None:
+    def close(self) -> None:
         """
-        Encerra navegador e Playwright, em qualquer estado.
+        Shuts down browser and Playwright, in any state.
 
-        Cada etapa é independente: uma falha ao fechar o navegador não pode
-        impedir o encerramento do Playwright, que é quem mantém o processo do
-        driver vivo. Idempotente — chamar duas vezes não quebra.
+        Each step is independent: a failure closing the browser must not
+        prevent stopping Playwright, which is what keeps the driver process
+        alive. Idempotent — calling it twice does not break.
         """
         try:
             if self._browser is not None:

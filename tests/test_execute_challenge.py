@@ -1,14 +1,14 @@
 """
-Testes do laço de processamento da fila (Executers/execute_challenge.py).
+Tests for the queue processing loop (Executors/execute_challenge.py).
 
-Rodam sem navegador e sem banco: o driver é o FakeDriver e o banco é um
-MagicMock, do qual só interessa **quais chamadas** foram feitas — é assim que se
-verifica a máquina de estados por item sem PostgreSQL nenhum.
+They run with no browser and no database: the driver is FakeDriver and the
+database is a MagicMock, of which only **which calls** were made matters — that
+is how the per-item state machine is verified with no PostgreSQL at all.
 """
 
 from unittest.mock import MagicMock
 
-from resources.Executers.execute_challenge import executar_challenge
+from resources.Executors.execute_challenge import run_challenge
 from resources.Schemas.item_run import Item, ItemInfo, ItemRun, ItemRunStatus
 from resources.Schemas.process_run import ProcessRun
 from tests.fake_driver import FakeDriver
@@ -25,13 +25,13 @@ PROCESS_RUN = ProcessRun(
 )
 
 
-def _item_info(item_id: int, primeiro_nome: str) -> ItemInfo:
+def _item_info(item_id: int, first_name: str) -> ItemInfo:
     return ItemInfo(
         process_run=PROCESS_RUN,
         item=Item(
             id=item_id,
             item_id=item_id,
-            First_Name=primeiro_nome,
+            First_Name=first_name,
             Last_Name='Sobrenome',
             Company_Name='Empresa',
             Role_in_Company='Cargo',
@@ -54,90 +54,89 @@ def _item_info(item_id: int, primeiro_nome: str) -> ItemInfo:
     )
 
 
-class DriverQueFalhaEm(FakeDriver):
-    """FakeDriver que estoura ao preencher o nome indicado."""
+class DriverThatFailsOn(FakeDriver):
+    """A FakeDriver that blows up when filling the given name."""
 
-    def __init__(self, nome_problematico: str):
+    def __init__(self, problem_name: str):
         super().__init__()
-        self._nome_problematico = nome_problematico
+        self._problem_name = problem_name
 
-    def preencher_campo(self, rotulo: str, valor: str) -> None:
-        if valor == self._nome_problematico:
-            raise RuntimeError(f'campo recusado: {valor}')
-        super().preencher_campo(rotulo, valor)
+    def fill_field(self, label: str, value: str) -> None:
+        if value == self._problem_name:
+            raise RuntimeError(f'field refused: {value}')
+        super().fill_field(label, value)
 
 
-def _status_gravados(db: MagicMock, status: ItemRunStatus) -> list[int]:
-    """item_ids que receberam aquele status, na ordem em que foram gravados."""
+def _recorded_statuses(db: MagicMock, status: ItemRunStatus) -> list[int]:
+    """The item_ids given that status, in the order they were written."""
     return [
-        chamada.args[0]
-        for chamada in db.update_item_run_status.call_args_list
-        if chamada.args[1] == status
+        call.args[0]
+        for call in db.update_item_run_status.call_args_list
+        if call.args[1] == status
     ]
 
 
-def test_todos_os_itens_marcados_como_completed_sem_falha():
+def test_every_item_marked_completed_when_nothing_fails():
     """
-    As asserções olham o **banco**, não um número devolvido: é lá que a contagem
-    é lida na hora de reportar, então é lá que o teste precisa verificar.
-    """
-    db = MagicMock()
-    itens = [_item_info(1, 'Ana'), _item_info(2, 'Bruno')]
-
-    resultado = executar_challenge(FakeDriver(), MagicMock(), itens, URL, db)
-
-    assert _status_gravados(db, ItemRunStatus.COMPLETED) == [1, 2]
-    assert _status_gravados(db, ItemRunStatus.FAILED) == []
-    assert '100%' in resultado
-
-
-def test_item_com_erro_nao_interrompe_os_seguintes():
-    """
-    O comportamento que justifica manter estado por item: numa carga de 5.000
-    registros, um dado ruim no meio não pode impedir os seguintes de serem
-    tentados. Antes desta mudança o laço abortava no primeiro erro.
+    The assertions look at the **database**, not at a returned number: that is
+    where the count is read from when reporting, so that is where the test has
+    to look.
     """
     db = MagicMock()
-    itens = [_item_info(1, 'Ana'), _item_info(2, 'Bruno'), _item_info(3, 'Carla')]
+    items = [_item_info(1, 'Ana'), _item_info(2, 'Bruno')]
 
-    executar_challenge(DriverQueFalhaEm('Bruno'), MagicMock(), itens, URL, db)
+    result = run_challenge(FakeDriver(), MagicMock(), items, URL, db)
 
-    assert _status_gravados(db, ItemRunStatus.COMPLETED) == [1, 3]
-    assert _status_gravados(db, ItemRunStatus.FAILED) == [2]
+    assert _recorded_statuses(db, ItemRunStatus.COMPLETED) == [1, 2]
+    assert _recorded_statuses(db, ItemRunStatus.FAILED) == []
+    assert '100%' in result
 
 
-def test_item_com_erro_e_marcado_como_failed_com_o_motivo():
+def test_an_item_that_errors_does_not_interrupt_the_following_ones():
+    """
+    The behaviour that justifies keeping per-item state: in a load of 5,000
+    records, one bad row in the middle must not stop the following ones from
+    being attempted. Before this change the loop aborted on the first error.
+    """
     db = MagicMock()
-    item_bom = _item_info(1, 'Ana')
-    item_ruim = _item_info(2, 'Bruno')
+    items = [_item_info(1, 'Ana'), _item_info(2, 'Bruno'), _item_info(3, 'Carla')]
 
-    executar_challenge(
-        DriverQueFalhaEm('Bruno'), MagicMock(), [item_bom, item_ruim], URL, db
-    )
+    run_challenge(DriverThatFailsOn('Bruno'), MagicMock(), items, URL, db)
 
-    falhas = [
-        chamada
-        for chamada in db.update_item_run_status.call_args_list
-        if chamada.args[1] == ItemRunStatus.FAILED
+    assert _recorded_statuses(db, ItemRunStatus.COMPLETED) == [1, 3]
+    assert _recorded_statuses(db, ItemRunStatus.FAILED) == [2]
+
+
+def test_an_item_that_errors_is_marked_failed_with_the_reason():
+    db = MagicMock()
+    good_item = _item_info(1, 'Ana')
+    bad_item = _item_info(2, 'Bruno')
+
+    run_challenge(DriverThatFailsOn('Bruno'), MagicMock(), [good_item, bad_item], URL, db)
+
+    failures = [
+        call
+        for call in db.update_item_run_status.call_args_list
+        if call.args[1] == ItemRunStatus.FAILED
     ]
-    assert len(falhas) == 1
-    # A asserção seguinte lê item_run.item_id, que o schema declara opcional.
-    # Escrever a suposição aqui troca um AttributeError em None por uma falha
-    # que diz qual premissa do teste deixou de valer.
-    assert item_ruim.item_run is not None
-    assert falhas[0].args[0] == item_ruim.item_run.item_id
-    assert 'campo recusado' in falhas[0].kwargs['exception_reason']
+    assert len(failures) == 1
+    # The next assertion reads item_run.item_id, which the schema declares
+    # optional. Writing the assumption down here trades an AttributeError on
+    # None for a failure that says which premise of the test stopped holding.
+    assert bad_item.item_run is not None
+    assert failures[0].args[0] == bad_item.item_run.item_id
+    assert 'field refused' in failures[0].kwargs['exception_reason']
 
 
-def test_resultado_so_e_gravado_nos_itens_que_deram_certo():
+def test_the_result_is_only_written_to_the_items_that_succeeded():
     """
-    Quem falhou não recebe a taxa de sucesso final: o campo `result` do item
-    ficaria dizendo que ele foi processado quando não foi.
+    Whoever failed does not get the final success rate: the item's `result`
+    field would be claiming it was processed when it was not.
     """
     db = MagicMock()
-    itens = [_item_info(1, 'Ana'), _item_info(2, 'Bruno'), _item_info(3, 'Carla')]
+    items = [_item_info(1, 'Ana'), _item_info(2, 'Bruno'), _item_info(3, 'Carla')]
 
-    executar_challenge(DriverQueFalhaEm('Bruno'), MagicMock(), itens, URL, db)
+    run_challenge(DriverThatFailsOn('Bruno'), MagicMock(), items, URL, db)
 
-    ids_gravados = db.update_items_result.call_args.args[0]
-    assert ids_gravados == [1, 3]
+    written_ids = db.update_items_result.call_args.args[0]
+    assert written_ids == [1, 3]
