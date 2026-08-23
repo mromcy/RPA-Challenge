@@ -1,8 +1,11 @@
-# Line endings are normalized to LF in the repository; working copies get the
-# platform's native endings on checkout. Without this, what lands in a blob
-# depends on each contributor's core.autocrlf, and the Linux CI runner receives
-# whatever a Windows machine happened to commit.
-* text=auto
+# Line endings are LF in the repository AND in the working copy, on every
+# platform. Without the first half, what lands in a blob depends on each
+# contributor's core.autocrlf, and the Linux CI runner receives whatever a
+# Windows machine happened to commit. Without eol=lf, a Windows checkout
+# converts to CRLF, so the files on disk stop matching the files CI reads and
+# git warns on every add. Nothing here needs CRLF: there is no .bat or .cmd in
+# the repository, which is the case where Windows actually cares.
+* text=auto eol=lf
 
 # Must keep LF even when checked out on Windows: a CR in a shebang line makes
 # Linux fail with "bad interpreter".
