@@ -41,7 +41,11 @@ quote-style = 'single'
 
 [tool.pytest.ini_options]
 pythonpath = "."
-addopts = '-p no:warnings'
+# No addopts here on purpose. It used to carry '-p no:warnings', which silenced
+# every warning the suite raised - and a deprecation warning is precisely the
+# signal you want before it becomes an error, with pandas 3.0 already out. The
+# suite currently raises none, so the suppression was hiding nothing and costing
+# the future warning.
 # Registering the marker makes pytest refuse an unknown label: without it, a
 # mistyped @pytest.mark.e2ee would create a test that never runs.
 markers = [
