@@ -18,11 +18,7 @@ orchestrator integration — and it drives the browser through **two
 interchangeable implementations, Playwright and Selenium**, so the two can be
 compared on the same flow with the same code.
 
-<!-- The demo is not recorded yet; the line stays commented out because GitHub
-     renders a missing image as a broken-image icon, and this is the first
-     screen of the page. Uncomment it when assets/demo.gif exists.
-![Demo](assets/demo.gif)
--->
+![The bot filling the RPA Challenge form with Selenium while the PostgreSQL queue moves from QUEUED to PROCESSING to COMPLETED](assets/demo.gif)
 
 ---
 
