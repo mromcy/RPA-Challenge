@@ -60,16 +60,39 @@ class Challenge:
         """
         Fills every field of the form and submits it.
 
+        **The submit is in a finally, and that is the whole point.** The
+        challenge has exactly ten rounds, and the site only advances to the next
+        one when a form is submitted. Submitting only on success would mean that
+        one bad record leaves the page sitting on its round: the next item fills
+        the same form, the tenth is never submitted, the result never appears,
+        and read_result waits out its full timeout before failing the entire
+        run. One unusable record would cost the other nine.
+
+        Submitting the partial form instead lets the round advance. The site
+        scores those fields as wrong, which is true - the record did fail - and
+        the item is already marked FAILED in the database by the caller. The
+        final success rate reported by the site drops below 100%, and that is
+        the honest outcome rather than a hidden one.
+
+        The submit is guarded because a raise inside a finally **replaces** the
+        original exception. If the browser died mid-field, the real cause is the
+        dead browser, not the submit that followed it - the same reasoning that
+        turns a failed driver.close() into a warning in execute.py.
+
         Args:
             item: Pydantic schema holding the current record's data, read from
                   the item table through get_queued_items_by_run.
         """
         self.logs.info(f'Filling form: {item.First_Name} {item.Last_Name}.')
 
-        for label, attribute in FORM_FIELDS.items():
-            self.driver.fill_field(label, getattr(item, attribute))
-
-        self.driver.submit()
+        try:
+            for label, attribute in FORM_FIELDS.items():
+                self.driver.fill_field(label, getattr(item, attribute))
+        finally:
+            try:
+                self.driver.submit()
+            except Exception as submit_error:
+                self.logs.warning(f'Failed to submit the form: {submit_error}')
 
     def capture_result(self) -> str:
         """

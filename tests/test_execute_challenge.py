@@ -140,3 +140,24 @@ def test_the_result_is_only_written_to_the_items_that_succeeded():
 
     written_ids = db.update_items_result.call_args.args[0]
     assert written_ids == [1, 3]
+
+
+def test_a_failed_item_still_submits_so_the_next_round_is_reached():
+    """
+    The challenge has ten fixed rounds and only advances on submit, so the
+    invariant is one submit per item - including the ones that failed.
+
+    Without it, a failed item leaves the page on its round, the next item fills
+    that same form, and the run ends one submit short: the site never shows the
+    final result and read_result waits out its timeout before taking the whole
+    run down. This test states the invariant in the place where the damage would
+    happen, and it fails if the submit ever goes back to being conditional on
+    success.
+    """
+    db = MagicMock()
+    items = [_item_info(1, 'Ana'), _item_info(2, 'Bruno'), _item_info(3, 'Carla')]
+    driver = DriverThatFailsOn('Bruno')
+
+    run_challenge(driver, MagicMock(), items, URL, db)
+
+    assert driver.operations.count('submit') == len(items)

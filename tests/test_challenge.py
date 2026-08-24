@@ -92,6 +92,51 @@ def test_fill_form_uses_the_values_of_the_item_it_received(challenge, driver):
     assert driver.filled_fields['Email'] == 'ana@exemplo.invalido'
 
 
+class _DriverThatRefusesOneField(FakeDriver):
+    """FakeDriver that raises while filling the field with the given label."""
+
+    def __init__(self, refused_label: str):
+        super().__init__()
+        self._refused_label = refused_label
+
+    def fill_field(self, label: str, value: str) -> None:
+        if label == self._refused_label:
+            raise RuntimeError(f'field refused: {label}')
+        super().fill_field(label, value)
+
+
+def test_fill_form_submits_even_when_a_field_fails():
+    """
+    The guard on the challenge's ten fixed rounds. The site only advances when a
+    form is submitted, so skipping the submit on failure would leave the page on
+    the same round: the next item would fill that same form, the tenth would
+    never be submitted, the result would never appear, and read_result would
+    burn its whole timeout before failing the run. One bad record would cost the
+    other nine.
+    """
+    driver = _DriverThatRefusesOneField('Email')
+    challenge = Challenge(driver, MagicMock())
+
+    with pytest.raises(RuntimeError):
+        challenge.fill_form(_item())
+
+    assert 'submit' in driver.operations
+
+
+def test_fill_form_lets_the_original_error_surface():
+    """
+    A raise inside a finally replaces the exception being propagated. If the
+    submit that runs on the way out were unguarded and also failed, the caller
+    would be told the submit broke, when what actually broke was the field - or
+    the browser behind it.
+    """
+    driver = _DriverThatRefusesOneField('Email')
+    challenge = Challenge(driver, MagicMock())
+
+    with pytest.raises(RuntimeError, match='field refused: Email'):
+        challenge.fill_form(_item())
+
+
 def test_capture_result_returns_the_text_read_by_the_driver(challenge):
     assert challenge.capture_result() == DEFAULT_RESULT
 
