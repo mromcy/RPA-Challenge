@@ -616,7 +616,7 @@ the live one.
 
 | Lane | Tests | Needs | Time |
 |---|---|---|---|
-| unit | 82 | nothing | ~2 s |
+| unit | 85 | nothing | ~2 s |
 | e2e | 2 | network + browser | ~20 s |
 
 **Why they are separated.** The end-to-end tests depend on a system nobody here
@@ -637,6 +637,36 @@ names the driver that broke without anyone opening a log.
 no browser. That is a property held on purpose, and two tests assert it by
 checking that the settings cache was never touched. A `conftest.py` fixture
 clears that cache around every test, so results never depend on execution order.
+
+### What the coverage number means
+
+The fast lane reports about **48%** of `resources`, and that figure is dominated
+by code it cannot reach by design. Of the 425 uncovered statements, **296 sit in
+six modules that need a live PostgreSQL just to be imported** — `operation_db`,
+`models`, `execute`, `add_process_run`, `create_items` and `database`. Another 66
+are in the two browser drivers, which the live lane covers instead. That leaves
+63 statements genuinely uncovered and reachable, 41 of them in the logging
+module. The code that needs neither a database nor a browser sits at roughly
+**85%**.
+
+The reason those six need a database at import time is a deliberate trade.
+`models.py` **reflects** `process_manager.process_run` from the database instead
+of declaring it here, because that table is shared with other automations and
+provisioned outside this project — keeping a local copy of a shared schema's
+definition is how drift between systems begins. The price is that the reflection
+runs on import, and pulls a connection with it. Reversing the trade means
+building the engine lazily and deferring the reflection, which changes how every
+database session in the project is obtained: worth doing deliberately, not
+casually. Until then `execute.py` has no unit tests, and that is a known cost
+rather than an oversight.
+
+There is deliberately **no `--cov-fail-under`**. A global percentage here moves
+mostly when database-bound code is added or removed, not when tests are — adding
+a correct new repository module would *lower* it and break the build. And it is
+too coarse to catch what it would exist to catch: business logic added to
+`challenge.py` without a test is four or five statements against a denominator of
+817, half a percentage point that no sane threshold would trip on. Coverage is
+read here as a report, not enforced as a gate.
 
 **The end-to-end test is one test, parametrised over both drivers.** Same
 assertions, two browser backends — which is what cross-browser testing is. It
