@@ -106,10 +106,10 @@ def browser_version(path: str) -> str:
 
 
 def load_items() -> list[Item]:
-    """The records in Entrada/, by the same path production walks."""
+    """The records in input/, by the same path production walks."""
     data = FileReader(
         _NoLog(),  # type: ignore[arg-type]
-        path_in=ROOT / 'Entrada',
+        path_in=ROOT / 'input',
     ).read_file()
 
     return [

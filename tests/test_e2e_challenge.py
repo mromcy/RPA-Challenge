@@ -28,7 +28,7 @@ from resources.Schemas.item_run import Item
 from resources.Utils.read_file import FileReader
 
 URL = 'https://rpachallenge.com/'
-INPUT_FOLDER = Path(__file__).resolve().parents[1] / 'Entrada'
+INPUT_FOLDER = Path(__file__).resolve().parents[1] / 'input'
 
 CONSTRUCTORS = {
     'playwright': PlaywrightDriver,
@@ -55,7 +55,7 @@ def driver(request):
 @pytest.fixture(scope='module')
 def items() -> list[Item]:
     """
-    The ten records of Entrada/challenge.xlsx, in the shape the flow consumes.
+    The ten records of input/challenge.xlsx, in the shape the flow consumes.
 
     It reuses FileReader and clean_dataframe instead of reimplementing the
     reading: it is the same path production walks, so a break there shows up

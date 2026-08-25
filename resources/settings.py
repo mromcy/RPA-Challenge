@@ -94,10 +94,10 @@ class Settings(BaseSettings):
             self.PATH_BASE = str(config_path().parent)
 
         if not self.PATH_IN:
-            self.PATH_IN = str(Path(self.PATH_BASE) / 'Entrada')
+            self.PATH_IN = str(Path(self.PATH_BASE) / 'input')
 
         if not self.PATH_OUT:
-            self.PATH_OUT = str(Path(self.PATH_BASE) / 'Saida')
+            self.PATH_OUT = str(Path(self.PATH_BASE) / 'output')
 
         return self
 

@@ -114,8 +114,8 @@ def test_input_and_output_derive_from_path_base(fake_root):
 
     settings = Settings()
 
-    assert settings.PATH_IN == str(fake_root / 'Entrada')
-    assert settings.PATH_OUT == str(fake_root / 'Saida')
+    assert settings.PATH_IN == str(fake_root / 'input')
+    assert settings.PATH_OUT == str(fake_root / 'output')
 
 
 def test_input_and_output_follow_a_declared_path_base(fake_root):
@@ -128,8 +128,8 @@ def test_input_and_output_follow_a_declared_path_base(fake_root):
 
     settings = Settings()
 
-    assert settings.PATH_IN == str(other_base / 'Entrada')
-    assert settings.PATH_OUT == str(other_base / 'Saida')
+    assert settings.PATH_IN == str(other_base / 'input')
+    assert settings.PATH_OUT == str(other_base / 'output')
 
 
 def test_config_json_beats_the_default(fake_root):
@@ -139,7 +139,7 @@ def test_config_json_beats_the_default(fake_root):
     settings = Settings()
 
     assert settings.PATH_IN == r'\\servidor\setor\entrada'
-    assert settings.PATH_OUT == str(fake_root / 'Saida')
+    assert settings.PATH_OUT == str(fake_root / 'output')
 
 
 def test_a_missing_config_json_raises_an_explanatory_error(fake_root):

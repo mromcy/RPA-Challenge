@@ -41,15 +41,15 @@ logs/*
 downloads/*
 !downloads/.gitkeep
 
-Saida/*
-!Saida/.gitkeep
+output/*
+!output/.gitkeep
 
 # =============================================================================
 # Input data (commented out by default - the official challenge.xlsx belongs in
 # the repository). Uncomment to stop versioning data files.
 # =============================================================================
-# Entrada/*.xlsx
-# !Entrada/.gitkeep
+# input/*.xlsx
+# !input/.gitkeep
 
 # =============================================================================
 # IDEs and editors

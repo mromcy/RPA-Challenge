@@ -103,7 +103,7 @@ resumable and reproducible**.
 ## How it works
 
 ```
-Excel (Entrada/) → PostgreSQL queue → Browser driver → Result
+Excel (input/) → PostgreSQL queue → Browser driver → Result
       │                   │                  │              │
    read and           per-item state     fill the form   success rate
    clean rows         and audit trail    by label        stored per item
@@ -131,8 +131,8 @@ rpa_challenge/
 ├── config.json                     # Local configuration (never committed)
 ├── config.example.json             # Template to copy
 ├── alembic.ini                     # Alembic configuration
-├── Entrada/                        # Input .xlsx files
-├── Saida/                          # Output files
+├── input/                          # Input .xlsx files
+├── output/                         # Output files
 ├── logs/  downloads/  secret/      # Created on first run
 │   └── db_credentials/
 │       ├── credentials.json        # Fernet-encrypted user and password
@@ -447,8 +447,8 @@ committed.
 | `PATH_BROWSER` | no | Browser executable, honoured by **both** drivers |
 | `PATH_SELENIUM_DRIVER` | no | `chromedriver` executable, Selenium only |
 | `PATH_BASE` | no | Repository root; derived automatically |
-| `PATH_IN` | no | Input folder; defaults to `<repo>/Entrada` |
-| `PATH_OUT` | no | Output folder; defaults to `<repo>/Saida` |
+| `PATH_IN` | no | Input folder; defaults to `<repo>/input` |
+| `PATH_OUT` | no | Output folder; defaults to `<repo>/output` |
 
 The three Maestro fields are structurally required but may hold placeholders
 when running locally — they are only used when the bot logs in to the
@@ -616,7 +616,7 @@ and silent degradation is worse than the failure it replaced.
 
 ## Input file
 
-Drop one or more `.xlsx` files into `Entrada/`, with exactly these columns:
+Drop one or more `.xlsx` files into `input/`, with exactly these columns:
 
 | Column |
 |---|
@@ -816,7 +816,7 @@ bot.py
         ├── 3. update_process_run_status(RUNNING)
         │
         ├── 4. read_data(logs) → FileReader(...).read_file()
-        │      Reads every .xlsx in Entrada/, oldest first,
+        │      Reads every .xlsx in input/, oldest first,
         │      applies clean_dataframe and concatenates
         │
         ├── 5. create_items(df, run_id)                       [database only]
