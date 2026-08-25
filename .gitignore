@@ -7,37 +7,33 @@ __pycache__/
 *.pyd
 
 # =============================================================================
-# Ambiente virtual
+# Virtual environment
 # =============================================================================
 .venv/
 venv/
 env/
 
 # =============================================================================
-# Testes e cobertura (artefatos gerados — nunca versionar)
+# Tests and coverage (generated artefacts - never versioned)
 # =============================================================================
 .coverage
 .coverage.*
 htmlcov/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 
 # =============================================================================
-# Credenciais — NUNCA commitar
+# Credentials - NEVER commit
 # =============================================================================
-# Configuração local com caminhos e credenciais reais
+# Local configuration, with real paths and credentials
 config.json
 
-# Pasta gerada em runtime com credenciais Fernet do banco
+# Created at runtime; holds the Fernet-encrypted database credentials
 secret/
 
-# Conteúdo real das credenciais em SECRETS/ (mantém .gitkeep para estrutura)
-SECRETS/**/credentials.json
-SECRETS/**/secret.key
-SECRETS/**/*.key
-
 # =============================================================================
-# Diretórios de runtime (mantém .gitkeep para preservar a pasta no repo)
+# Runtime directories (.gitkeep is kept, so the folder survives in the repo)
 # =============================================================================
 logs/*
 !logs/.gitkeep
@@ -49,14 +45,14 @@ Saida/*
 !Saida/.gitkeep
 
 # =============================================================================
-# Dados de entrada (comentado por padrão — o challenge.xlsx oficial pode ficar)
-# Descomente se não quiser versionar arquivos de dados
+# Input data (commented out by default - the official challenge.xlsx belongs in
+# the repository). Uncomment to stop versioning data files.
 # =============================================================================
 # Entrada/*.xlsx
 # !Entrada/.gitkeep
 
 # =============================================================================
-# IDEs e editores
+# IDEs and editors
 # =============================================================================
 .vscode/
 .idea/
@@ -65,21 +61,21 @@ Saida/*
 *.swo
 
 # =============================================================================
-# Sistema operacional
+# Operating system
 # =============================================================================
 .DS_Store
 Thumbs.db
 desktop.ini
 
 # =============================================================================
-# Arquivos de distribuição
+# Distribution files
 # =============================================================================
 *.zip
 *.tar.gz
 
 # =============================================================================
-# Documentos internos — não fazem parte do projeto público
+# Internal documents - not part of the public project
 # =============================================================================
-# Cobre PORTFOLIO_BRIEF.md (a especificação) e PORTFOLIO_PROGRESS.md (o
-# acompanhamento), além de qualquer companheiro futuro dessa família.
+# Covers PORTFOLIO_BRIEF.md (the specification), PORTFOLIO_PROGRESS.md (the
+# running log) and any future member of that family.
 PORTFOLIO_*.md
