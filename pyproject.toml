@@ -53,6 +53,9 @@ markers = [
 
 [tool.taskipy.tasks]
 lint = 'ruff check .'
+# The same command CI runs, so the answer is available before a push
+# instead of after one.
+typecheck = 'mypy'
 format = 'ruff check . --fix --exit-zero && ruff format .'
 run = 'python bot.py'
 # Poetry is a development tool; whoever only wants to run the bot installs
@@ -79,3 +82,19 @@ ruff = "^0.15.0"
 taskipy = "^1.14.1"
 pytest = "^9.0.0"
 pytest-cov = "^7.1.0"
+mypy = "^2.3.1"
+
+# Starts permissive on purpose. The point is to have a real check running in CI,
+# not to win a fight with the type system: `ignore_missing_imports` covers the
+# libraries that publish no stubs (botcity, taskipy), and the strictness is
+# raised only where it is cheap. What must hold is the BrowserDriver Protocol -
+# that is the claim base.py makes, and the reason this tool is here at all.
+[tool.mypy]
+python_version = "3.11"
+files = ["resources", "tests", "benchmarks", "bot.py"]
+ignore_missing_imports = true
+
+# A suppression that suppresses nothing is worse than none: it reads as a known
+# limitation and is really just noise, and it hides the day the underlying
+# problem is fixed. This makes the checker report them.
+warn_unused_ignores = true

@@ -68,9 +68,14 @@ class _NoLog:
     the type checker charges for: `BrowserDriver` is a Protocol, and structural
     conformance is enough; `Logs` is a concrete class, and whoever receives one
     annotates the class. That is why the two calls below carry
-    `pyright: ignore` — a recorded decision, not an oversight. Turning `Logs`
+    `type: ignore` — a recorded decision, not an oversight. Turning `Logs`
     into a Protocol would fix it properly, and that is a change to production
     annotations for the benefit of a measurement script.
+
+    The comments say `type: ignore` rather than `pyright: ignore` because the
+    checker that runs in CI is mypy, and mypy does not read pyright's form —
+    the suppressions would have been silently doing nothing. Pyright honours
+    `type: ignore` too, so the editor stays quiet as well.
     """
 
     def info(self, *_, **__) -> None: ...
@@ -103,7 +108,7 @@ def browser_version(path: str) -> str:
 def load_items() -> list[Item]:
     """The records in Entrada/, by the same path production walks."""
     data = FileReader(
-        _NoLog(),  # pyright: ignore[reportArgumentType]
+        _NoLog(),  # type: ignore[arg-type]
         path_in=ROOT / 'Entrada',
     ).read_file()
 
@@ -134,7 +139,7 @@ def one_run(name: str, items: list[Item], path_browser: str) -> dict[str, float]
     driver = CONSTRUCTORS[name](headless=True, path_browser=path_browser)
     challenge = Challenge(
         driver,
-        _NoLog(),  # pyright: ignore[reportArgumentType]
+        _NoLog(),  # type: ignore[arg-type]
     )
 
     try:

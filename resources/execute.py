@@ -15,6 +15,12 @@ filled all the same — which is what lets somebody clone the repository and run
 it without provisioning PostgreSQL first.
 """
 
+# Annotations are not evaluated at runtime, which is what lets self.db be
+# annotated with OperationDb below: on a machine with no database that name was
+# never bound, and an annotation on an attribute target - unlike one on a plain
+# local - would otherwise be evaluated and raise NameError.
+from __future__ import annotations
+
 import getpass
 import socket
 import traceback
@@ -215,7 +221,10 @@ class Execute:
             self.logs.info(f'Driver set by the task parameter: {self.chosen_driver}.')
 
         if DATABASE:
-            self.db = OperationDb()
+            # The union is declared, not inferred: without it the first
+            # assignment would fix the attribute as OperationDb and the fallback
+            # below would be a type error.
+            self.db: OperationDb | NoDatabase = OperationDb()
 
             # Creates the initial record in the database; from here on, run_id
             # identifies this run across every related table

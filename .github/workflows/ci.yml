@@ -55,6 +55,13 @@ jobs:
       - name: Formatting
         run: ruff format --check .
 
+      # base.py claims the BrowserDriver Protocol is verified statically. This
+      # is the step that makes the claim true: without a checker running here,
+      # the Protocol is documentation and the suppressions scattered through the
+      # code suppress errors nobody ever sees.
+      - name: Type check
+        run: mypy
+
       # No config.json, no database, no browser. The suite claims to need none
       # of them - two tests assert the settings cache is never touched - and
       # this job is where that claim meets a machine that has none.

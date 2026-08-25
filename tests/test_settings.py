@@ -103,7 +103,7 @@ def test_the_default_path_base_is_the_config_folder(fake_root):
     """
     _write_config(fake_root)
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
 
     assert settings.PATH_BASE == str(fake_root)
 
@@ -112,7 +112,7 @@ def test_input_and_output_derive_from_path_base(fake_root):
     """The case of whoever clones: a config.json with no PATH_IN or PATH_OUT."""
     _write_config(fake_root)
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
 
     assert settings.PATH_IN == str(fake_root / 'Entrada')
     assert settings.PATH_OUT == str(fake_root / 'Saida')
@@ -126,7 +126,7 @@ def test_input_and_output_follow_a_declared_path_base(fake_root):
     other_base = fake_root / 'robos' / 'rpa_challenge'
     _write_config(fake_root, PATH_BASE=str(other_base))
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
 
     assert settings.PATH_IN == str(other_base / 'Entrada')
     assert settings.PATH_OUT == str(other_base / 'Saida')
@@ -136,7 +136,7 @@ def test_config_json_beats_the_default(fake_root):
     """The capability that justified keeping the keys: a network folder."""
     _write_config(fake_root, PATH_IN=r'\\servidor\setor\entrada')
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
 
     assert settings.PATH_IN == r'\\servidor\setor\entrada'
     assert settings.PATH_OUT == str(fake_root / 'Saida')
@@ -146,13 +146,13 @@ def test_a_missing_config_json_raises_an_explanatory_error(fake_root):
     """With no config.json, the message has to say what to do — not blow up
     with a Pydantic validation error listing ten missing fields."""
     with pytest.raises(FileNotFoundError, match='config.example.json'):
-        Settings()  # type: ignore[call-arg]
+        Settings()
 
 
 def test_the_derived_folders_hang_off_path_base(fake_root):
     _write_config(fake_root, PATH_BASE=str(fake_root))
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
 
     assert settings.PATH_LOGS == str(fake_root / 'logs')
     assert settings.PATH_DOWNLOADS == str(fake_root / 'downloads')
@@ -162,7 +162,7 @@ def test_the_derived_folders_hang_off_path_base(fake_root):
 def test_the_derived_folders_are_created_when_accessed(fake_root):
     _write_config(fake_root, PATH_BASE=str(fake_root))
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
 
     assert not (fake_root / 'logs').exists()
 
@@ -178,6 +178,6 @@ def test_unknown_keys_in_config_json_are_ignored(fake_root):
     """
     _write_config(fake_root, KEY_THAT_DOES_NOT_EXIST='value')
 
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
 
     assert settings.PROJECT_NAME == 'projeto_de_teste'

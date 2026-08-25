@@ -236,7 +236,7 @@ class OperationDb:
         with get_session() as session:
             stmt = (
                 select(ORMItemRun.status, func.count())
-                .where(ORMItemRun.run_id == run_id)  # type: ignore[arg-type]
+                .where(ORMItemRun.run_id == run_id)
                 .group_by(ORMItemRun.status)
             )
             by_status = {status: amount for status, amount in session.execute(stmt)}
@@ -276,7 +276,7 @@ class OperationDb:
 
         with get_session() as session:
             ir: Any = session.execute(
-                select(ORMItemRun).where(ORMItemRun.item_id == item_id)  # type: ignore[attr-defined]
+                select(ORMItemRun).where(ORMItemRun.item_id == item_id)
             ).scalar_one_or_none()
 
             if ir is None:
@@ -322,7 +322,7 @@ class OperationDb:
         with get_session() as session:
             for item_id in item_ids:
                 it: Any = session.execute(
-                    select(ORMItem).where(ORMItem.item_id == item_id)  # type: ignore[attr-defined]
+                    select(ORMItem).where(ORMItem.item_id == item_id)
                 ).scalar_one_or_none()
                 if it is not None:
                     it.result = result

@@ -37,7 +37,15 @@ def create_items(data: pd.DataFrame, run_id: int) -> list[int]:
         for _, row in data.iterrows():
             item_key = f'{row["First Name"]}_{row["Phone Number"]}'
 
-            item_run: Any = ORMItemRun(
+            # SQLAlchemy decorates mapped_as_dataclass with @dataclass_transform,
+            # but neither type checker acts on it: mypy reveals __init__ as
+            # `def (self: object)` for a twelve-line class with nothing from this
+            # project in it, so every field reads as an unexpected keyword. The
+            # constructor is generated at runtime and works. add_process_run.py
+            # dodges the same limitation by assigning attributes one by one -
+            # that is the alternative, and it is worse here, because these two
+            # classes really are dataclasses.
+            item_run: Any = ORMItemRun(  # type: ignore[call-arg]
                 run_id=run_id,
                 process_name=settings.PROJECT_NAME,
                 item_key=item_key,
@@ -53,7 +61,7 @@ def create_items(data: pd.DataFrame, run_id: int) -> list[int]:
             # which allows reading item_id before the implicit commit
             session.flush()
 
-            item: Any = ORMItem(
+            item: Any = ORMItem(  # type: ignore[call-arg]
                 item_id=item_run.item_id,
                 First_Name=str(row['First Name']),
                 Last_Name=str(row['Last Name']),

@@ -35,7 +35,10 @@ class BrowserDriver(Protocol):
     knows nothing about resources/.
 
     Verification is static: what reports a missing method is the type checker,
-    not the interpreter.
+    not the interpreter. That is only worth writing down because CI runs one -
+    `mypy` gates every push, next to ruff. Before it did, this paragraph
+    described a check nobody performed, and the Protocol was documentation
+    wearing the costume of a contract.
     """
 
     name: str

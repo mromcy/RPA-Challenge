@@ -393,7 +393,7 @@ pip install -r requirements.txt
 **To develop, or to run the test suite:**
 
 ```bash
-pip install -r requirements-dev.txt   # adds pytest, ruff, taskipy
+pip install -r requirements-dev.txt   # adds pytest, ruff, mypy, taskipy
 ```
 
 ```bash
@@ -689,12 +689,19 @@ that sees red often enough learns to answer it with "run it again" — including
 the day the red is real. The live lane belongs on a schedule and on demand, not
 on every commit.
 
-**That separation is what `.github/workflows/ci.yml` implements.** The fast lane
-and a check that the exported `requirements*.txt` still match `pyproject.toml`
-gate every push and pull request. The fast lane runs on 3.11 and 3.13, the ends
+**That separation is what `.github/workflows/ci.yml` implements.** The fast lane,
+`mypy`, and a check that the exported `requirements*.txt` still match
+`pyproject.toml` gate every push and pull request. The fast lane runs on 3.11 and 3.13, the ends
 of the supported range, because compatibility breaks at the edges. The live lane runs Monday mornings and from
 the Actions tab, never on a push, as two jobs — one per driver — so a failure
 names the driver that broke without anyone opening a log.
+
+**The type checker is what makes the `BrowserDriver` Protocol a contract.**
+Structural conformance is checked statically or not at all, so `mypy` runs in CI
+next to ruff. Turning it on paid for itself immediately: `warn_unused_ignores`
+found that **11 of the project's 22 `# type: ignore` comments suppressed
+nothing** — they had been written for the editor's checker and carried error
+codes that no tool ever read. They are gone.
 
 **The fast lane needs no configuration at all.** No database, no `config.json`,
 no browser. That is a property held on purpose, and two tests assert it by
@@ -1013,6 +1020,7 @@ Sample output:
 | [BotCity Maestro SDK](https://botcity.dev) | >=0.9 | Orchestrator integration |
 | [pytest](https://docs.pytest.org) | >=9.0 | Test runner *(dev)* |
 | [Ruff](https://docs.astral.sh/ruff/) | >=0.15 | Linting and formatting *(dev)* |
+| [mypy](https://mypy-lang.org) | >=2.3 | Static type checking, in CI *(dev)* |
 | [Poetry](https://python-poetry.org) | — | Dependency management *(dev)* |
 
 ---
