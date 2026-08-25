@@ -12,7 +12,8 @@
 
 A Python RPA bot that solves the [RPA Challenge](https://rpachallenge.com/): it
 reads records from an Excel file, tracks every item through a queue in
-PostgreSQL, and fills the form in a real browser. It is built the way a
+PostgreSQL, and fills the form in a real browser. The database is **optional** —
+clone it, and it runs without one. It is built the way a
 production robot is built — state machine, audit trail, encrypted credentials,
 orchestrator integration — and it drives the browser through **two
 interchangeable implementations, Playwright and Selenium**, so the two can be
@@ -106,11 +107,19 @@ Excel (Entrada/) → PostgreSQL queue → Browser driver → Result
       │                   │                  │              │
    read and           per-item state     fill the form   success rate
    clean rows         and audit trail    by label        stored per item
-                           │
-                     BotCity Maestro
-                  (scheduling, monitoring,
-                     outcome reporting)
+      │                    │
+      │              BotCity Maestro
+      │           (scheduling, monitoring,
+      │              outcome reporting)
+      │
+      └──────────────────────────────→ (no database: the queue step is
+                                         skipped and the items go straight
+                                         from the spreadsheet to the driver)
 ```
+
+Both middle boxes are optional and detected at startup: no BotCity, no
+reporting; no PostgreSQL, no queue. The form still gets filled either way.
+See [Running without a database](#running-without-a-database).
 
 ---
 
@@ -137,14 +146,18 @@ rpa_challenge/
 │   ├── conftest.py                 # Shared fixtures; isolates settings cache
 │   ├── fake_driver.py              # Records calls; no browser involved
 │   ├── test_challenge.py           # Business flow, incl. architecture guard
+│   ├── test_execute.py             # The orchestrator, end to end, no browser
+│   ├── test_no_database.py         # The run with no PostgreSQL at all
+│   ├── test_execute_challenge.py   # The per-item queue loop
+│   ├── test_failure_report.py      # What reaches the Maestro panel
 │   ├── test_cli.py  test_cryptography.py  test_read_file.py
-│   ├── test_settings.py
+│   ├── test_factory.py  test_settings.py  test_environment.py
 │   └── test_e2e_challenge.py       # Live site, both drivers (marker: e2e)
 └── resources/
     ├── settings.py                 # Config via Pydantic + Fernet credentials
     ├── cli.py                      # Command-line parsing, kept out of bot.py
     ├── database.py                 # SQLAlchemy engine and session
-    ├── models.py                   # ORM models and status enums
+    ├── models.py                   # ORM models (reflects process_run)
     ├── execute.py                  # Orchestrator, incl. BotCity integration
     ├── Drivers/
     │   ├── base.py                 # BrowserDriver protocol + shared timeout
@@ -154,7 +167,8 @@ rpa_challenge/
     │   └── factory.py              # Builds the requested driver
     ├── Executors/execute_challenge.py
     ├── Modules/challenge.py        # Business flow — knows no browser library
-    ├── Schemas/                    # Pydantic: ItemRun, Item, ItemInfo, ProcessRun
+    ├── Schemas/                    # Pydantic models + the status enums,
+    │                                #   which import with no database
     ├── Tools/                      # Logging, BotCity, process_run creation
     └── Utils/                      # Excel reading, item creation, DB operations
 ```
@@ -189,6 +203,11 @@ Median of 5 runs, min–max in parentheses, warm-up discarded.
 immune to where our stopwatch sits. `rest` is the subtraction, and it is
 deliberately **not** called *startup*: it also contains the Start click and the
 final read.
+
+> Subtracting the two medians in the table gives 4.05 s for Selenium, not 4.42 s.
+> That is not an error: `rest` is subtracted **per run** and the median taken of
+> those five differences, and the median of differences is not the difference of
+> medians. Each column is the median of what it measures.
 
 **The interesting number is `rest`.** Launching the browser and navigating costs
 roughly the same on both sides — 3.78 s against 4.42 s, 17% apart. Of the 4.91 s
@@ -285,7 +304,7 @@ Stated plainly, because the number is only worth what its limits are:
   *present*, *visible* and *enabled*, but not *stable* (not animating) and not
   *unobstructed* (nothing intercepting the click) — two checks Playwright makes
   before every action. Reproducing them would require custom conditions. See the
-  `_esperar` docstring in `selenium_driver.py`.
+  `_wait_for` docstring in `selenium_driver.py`.
 - **Zero failures out of ten is not zero flakiness.** By the rule of three, no
   occurrences in N trials bounds the rate at roughly 3/N with 95% confidence —
   with ten runs, that is 30%. Claiming under 1% would take some three hundred
@@ -335,10 +354,12 @@ of any measured difference would be browser against browser.
   and need libpq and a C compiler. CI runs both ends. Outside the range the bot
   refuses to start and says why, because `pip` would install nothing and still
   report success
-- **PostgreSQL** 13+, local or reachable over the network
 - **Google Chrome** — needed by the Selenium driver; the Playwright driver ships
   its own Chromium
 - **Git**
+- **PostgreSQL** 13+ is optional: with one, every item is tracked through the
+  queue; without one, the items are read straight from the spreadsheet. See
+  [Running without a database](#running-without-a-database)
 - A **BotCity Maestro** account is optional: the bot runs identically without one
 
 ---
@@ -547,7 +568,49 @@ This creates `rpa_challenge.item_run` (per-item tracking) and
 managed outside this project.
 
 > `bot.py` runs `alembic upgrade head` itself before starting, so this step is
-> only needed when setting the database up by hand.
+> only needed when setting the database up by hand. It skips the migrations when
+> there is no database to migrate.
+
+### Running without a database
+
+The whole section above is optional. `git clone`, `pip install -r
+requirements.txt`, `cp config.example.json config.json`, and the bot runs — no
+PostgreSQL, no `process_manager` schema, no encrypted credentials.
+
+Copying the template unchanged is enough: the four `*_POSTGRES` keys stay
+required by the settings schema and the template already fills them, so they are
+validated and then simply never used. Leaving them pointing at a database that
+does not exist is exactly the case this section describes.
+
+The decision is made once, on import, and it is made by trying: the modules that
+talk to the database open their connection while *being imported*, so the check
+has to wrap the import rather than the call. Three failures mean the same thing
+and are named explicitly — a missing `secret/` folder (what a fresh clone looks
+like, since `.gitignore` keeps credentials out of the repository), a server that
+does not answer, and a server that answers but was never provisioned with
+`process_manager`. Anything else propagates, because a typo inside
+`operation_db` reported as "no database available" would send whoever
+investigates to the wrong place entirely.
+
+| | With a database | Without one |
+|---|---|---|
+| Items come from | `rpa_challenge.item_run`, after being written there | the spreadsheet, directly |
+| Run record | one row in `process_manager.process_run` | none |
+| Per-item audit trail | timestamps, attempt count, failure reason | none |
+| Survives a crash | yes — the queue holds what was done | no |
+| Final counts | read back from the queue | tallied in memory |
+| Form gets filled | yes | yes |
+
+The last two rows are the point. The processing loop is the *same code* either
+way — it always took the item store as a parameter, and it never asks which one
+it received. What changes is what outlives the run.
+
+**The fallback announces itself as a `WARNING`, not as an `info`.** The person
+this protects is not the reviewer who cloned the repository and knows perfectly
+well they have no database. It is the machine that was supposed to have one and
+lost it — a rotated password, a server that did not come back after a reboot.
+That run would otherwise look like a complete success while persisting nothing,
+and silent degradation is worse than the failure it replaced.
 
 ---
 
@@ -586,7 +649,7 @@ python bot.py --help
 Locally, the bot detects that no orchestrator started it and prints:
 
 ```
-Executando em modo local (sem task_id).
+Running in local mode (no task_id).
 ```
 
 Everything else runs normally; nothing is reported to Maestro.
@@ -616,7 +679,7 @@ the live one.
 
 | Lane | Tests | Needs | Time |
 |---|---|---|---|
-| unit | 85 | nothing | ~2 s |
+| unit | 95 | nothing | ~2 s |
 | e2e | 2 | network + browser | ~20 s |
 
 **Why they are separated.** The end-to-end tests depend on a system nobody here
@@ -640,16 +703,49 @@ clears that cache around every test, so results never depend on execution order.
 
 ### What the coverage number means
 
-The fast lane reports about **48%** of `resources`, and that figure is dominated
-by code it cannot reach by design. Of the 425 uncovered statements, **296 sit in
-six modules that need a live PostgreSQL just to be imported** — `operation_db`,
-`models`, `execute`, `add_process_run`, `create_items` and `database`. Another 66
-are in the two browser drivers, which the live lane covers instead. That leaves
-63 statements genuinely uncovered and reachable, 41 of them in the logging
-module. The code that needs neither a database nor a browser sits at roughly
-**85%**.
+The fast lane reports about **63%** of `resources`, and that figure is still
+dominated by code it cannot reach by design. Of the 315 uncovered statements,
+**218 sit in five modules that need a live PostgreSQL just to be imported** —
+`operation_db`, `models`, `add_process_run`, `create_items` and `database`.
+Another 66 are in the two browser drivers, which the live lane covers instead.
+That leaves **31** statements genuinely uncovered and reachable. The code that
+needs neither a database nor a browser sits at roughly **94%**.
 
-The reason those six need a database at import time is a deliberate trade.
+> Every number here is measured the way CI runs the suite: **no `config.json`,
+> no `secret/`, no database**. The condition matters — on a clone that does have
+> a `config.json`, one more statement in `settings.py` gets covered and the
+> totals read 314 and 30 instead. To reproduce exactly what this paragraph
+> claims, run it somewhere none of those three exist, and with the
+> `RPA_CHALLENGE_CONFIG` environment variable unset.
+
+`execute.py` used to be the sixth name on that list, and the orchestrator having
+no unit tests used to be recorded here as a known cost. It left the list when
+the database became optional: the imports that open a connection now sit inside
+a `try`, so the module loads on a machine with neither configuration nor
+PostgreSQL. `tests/test_execute.py` then drove the whole `Execute` class from
+the top — a spreadsheet on disk, a fake browser, no network — and took it from
+0% to **96%**, the remainder being the import lines that can only run where a
+database exists.
+
+**Watch the two figures move in opposite directions on the way there.** Making
+the database optional pushed the overall number **up** (48% → 53%) while pushing
+"the code that needs neither a database nor a browser" **down** (~85% → ~78%):
+ninety-two statements left the bucket that was excused from measurement and
+entered the one that is measured, arriving untested. Writing the tests then
+moved both up together (53% → 63%, ~78% → ~94%). One metric, two directions,
+from a change that only ever improved the codebase — which is the whole argument
+of the next paragraph.
+
+The tests earned something the percentage does not show, too. Four behaviours in
+`execute.py` existed only as prose: that the browser is closed even when the
+challenge blows up, that a failure *while closing* must not replace the real
+error, that a failure *while counting* must not mask the exception being
+reported, and that the numbers sent to the orchestrator come from the item store
+rather than from a counter in memory. Each was verified by breaking it on
+purpose and confirming exactly one test objected.
+
+The reason the remaining five need a database at import time is a deliberate
+trade.
 `models.py` **reflects** `process_manager.process_run` from the database instead
 of declaring it here, because that table is shared with other automations and
 provisioned outside this project — keeping a local copy of a shared schema's
@@ -657,15 +753,16 @@ definition is how drift between systems begins. The price is that the reflection
 runs on import, and pulls a connection with it. Reversing the trade means
 building the engine lazily and deferring the reflection, which changes how every
 database session in the project is obtained: worth doing deliberately, not
-casually. Until then `execute.py` has no unit tests, and that is a known cost
-rather than an oversight.
+casually. The optional-database fallback does not reverse it — it routes around
+it, which is why those five modules are still unreachable here while the
+orchestrator that used to import them is now covered like any other module.
 
 There is deliberately **no `--cov-fail-under`**. A global percentage here moves
 mostly when database-bound code is added or removed, not when tests are — adding
 a correct new repository module would *lower* it and break the build. And it is
 too coarse to catch what it would exist to catch: business logic added to
 `challenge.py` without a test is four or five statements against a denominator of
-817, half a percentage point that no sane threshold would trip on. Coverage is
+849, half a percentage point that no sane threshold would trip on. Coverage is
 read here as a report, not enforced as a gate.
 
 **The end-to-end test is one test, parametrised over both drivers.** Same
@@ -687,9 +784,9 @@ values"* into a dictionary assertion that runs in milliseconds. It neither
 inherits from nor imports the protocol — structural conformance is what makes
 that possible.
 
-Every test in this suite was validated by breaking the corresponding code on
-purpose and checking that it, and only it, turns red. A test that cannot fail
-proves nothing.
+Every test here was validated by breaking the code it covers on purpose and
+confirming it turns red. A test that cannot fail proves nothing — and a suite
+that has never been seen failing is an assumption, not evidence.
 
 ---
 
@@ -698,15 +795,16 @@ proves nothing.
 ```
 bot.py
   ├── parse --driver and remove it from sys.argv
-  ├── alembic upgrade head                     (migrations run automatically)
+  ├── alembic upgrade head                     (only when there is a database)
   └── Execute(driver).execute()
         │
         ├── 1. BotMaestroSDK.from_sys_args()
         │      Reads the orchestrator arguments positionally.
         │      Fewer than four means local mode: task_id = None
         │
-        ├── 2. AddProcessRun().execute()
-        │      Inserts process_run with status SCHEDULED, returns run_id
+        ├── 2. AddProcessRun().execute()                      [database only]
+        │      Inserts process_run with status SCHEDULED, returns run_id.
+        │      With no database, run_id is 0 and a WARNING is logged
         │
         ├── 3. update_process_run_status(RUNNING)
         │
@@ -714,10 +812,13 @@ bot.py
         │      Reads every .xlsx in Entrada/, oldest first,
         │      applies clean_dataframe and concatenates
         │
-        ├── 5. create_items(df, run_id)
+        ├── 5. create_items(df, run_id)                       [database only]
         │      For each row: ORMItemRun (QUEUED) + ORMItem with the form data
         │
-        ├── 6. get_queued_items_by_run(run_id)
+        ├── 6. get_queued_items_by_run(run_id)                [database only]
+        │      Steps 5 and 6 are the round trip through the queue. With no
+        │      database, items_from_dataframe(df) builds the same objects
+        │      straight from the spreadsheet and steps 5-6 do not happen
         │
         ├── 7. create_driver(...) → run_challenge(driver, logs, items, url, db)
         │      Launches the browser through the selected driver
@@ -728,9 +829,11 @@ bot.py
         │        ├── submits
         │        └── update_item_run_status(COMPLETED | FAILED)
         │      Reads the final success rate and stores it per item
-        │      Returns (processed, failed)
+        │      Returns that text. Deliberately **not** the counts:
+        │      those are read back from the item store, which keeps
+        │      being right when a failure interrupts the loop
         │
-        ├── 8. driver.fechar() in a finally block
+        ├── 8. driver.close() in a finally block
         │      A cleanup failure is logged as a warning, never allowed to
         │      mask the original error
         │
@@ -793,8 +896,9 @@ a typo in the panel leaves no half-finished run behind.
 
 | Event | SDK call | When |
 |---|---|---|
-| Successful completion | `finish_task(SUCCESS)` | Run finished without errors |
-| Failed run | `finish_task(FAILED)` | Any unhandled exception |
+| Successful completion | `finish_task(SUCCESS)` | Run finished, no item failed |
+| Completed with failures | `finish_task(PARTIALLY_COMPLETED)` | Queue finished, some items errored |
+| Failed run | `finish_task(FAILED)` | The run did not reach the end |
 | Error detail | `maestro.error()` | `logs.error()` called with an exception |
 
 `finish_task` carries `total_items`, `processed_items` and `failed_items`, which
