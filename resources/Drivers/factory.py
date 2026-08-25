@@ -15,25 +15,11 @@ AVAILABLE_DRIVERS = ('playwright', 'selenium')
 
 def driver_from_parameters(parameters: Mapping[str, object]) -> str | None:
     """
-    Reads the driver from the parameters of a BotCity Maestro task.
+    Reads the driver from a Maestro task's parameters, or None if absent.
 
-    It allows choosing the library when firing the task from the panel, with no
-    redeploy and without registering a second automation. It lives here, and not
-    in execute.py, because this is the module that owns the driver names — the
-    original reason was that execute.py could not be imported without a
-    database, which stopped being true when the database became optional.
-
-    Args:
-        parameters: The run's parameter dictionary. Empty in local mode.
-
-    Returns:
-        str | None: The driver name, or None when the parameter was not
-            supplied — in which case the decision falls back to Settings.DRIVER.
-
-    Raises:
-        ValueError: If the parameter carries an unknown driver. Failing here,
-            at launch, is better than failing after the migrations have run and
-            the run record already exists in the database.
+    It lets the panel choose the library for one run, with no redeploy and no
+    second automation registered. An unknown value raises here, at launch,
+    rather than after the migrations have run and the run record already exists.
     """
     value = parameters.get('driver')
     if not value:
@@ -54,51 +40,25 @@ def resolve_driver(
     task_parameters: Mapping[str, object],
 ) -> str | None:
     """
-    Decides the driver in three layers, from the most specific to the most
-    general.
+    Decides the driver in three layers, most specific first.
 
-    1. `--driver` on the command line: whoever typed it now wanted this now.
-    2. The Maestro task's `driver` parameter: a choice for *this* run, made in
-       the panel, with no redeploy.
-    3. `None`, letting `create_driver` fall back to `DRIVER` from config.json,
-       which is the machine's default.
-
-    Args:
-        from_command_line: The value of `--driver`, if supplied.
-        task_parameters: The run's parameters. Empty in local mode.
-
-    Returns:
-        str | None: The chosen driver, or None to use the machine's default.
-
-    Raises:
-        ValueError: If the task parameter carries an unknown driver.
+    1. `--driver` on the command line: whoever typed it wanted this, now.
+    2. The Maestro task parameter: a choice for *this* run, from the panel.
+    3. None, which lets create_driver fall back to the machine's DRIVER.
     """
     return from_command_line or driver_from_parameters(task_parameters)
 
 
 def create_driver(name: str | None = None, headless: bool = True) -> BrowserDriver:
     """
-    Returns the requested driver, already configured from the settings.
+    Returns the named driver, configured from the settings. Omitted, uses
+    Settings.DRIVER.
 
-    The library imports happen **inside** each branch, and not at the top of
-    the module, for two reasons. First, a run should only pay the cost of
-    importing the library it is going to use: `playwright.sync_api` loads 177
-    modules and `selenium.webdriver` loads 23. Second, and more importantly:
-    the benchmark measures startup time, and importing both on every run would
-    add the same cost to both sides, hiding the real startup difference.
-
-    That is why both import lines carry `noqa: PLC0415` — the rule is right as
-    a default, and this is the exception it exists to allow.
-
-    Args:
-        name: 'playwright' or 'selenium'. Omitted, uses Settings.DRIVER.
-        headless: No visible window.
-
-    Returns:
-        BrowserDriver: An implementation ready to use.
-
-    Raises:
-        ValueError: If the name matches no known driver.
+    The library imports sit **inside** each branch on purpose: a run should only
+    pay for the library it uses (playwright.sync_api loads 177 modules,
+    selenium.webdriver 23), and the benchmark measures startup — importing both
+    every time would add the same cost to both sides and hide the difference it
+    exists to show. Hence the `noqa: PLC0415` on both lines.
     """
     settings = get_settings()
     chosen = (name or settings.DRIVER).strip().lower()

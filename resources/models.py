@@ -1,18 +1,11 @@
 """
-The project's ORM models and status enums.
+The project's ORM models.
 
-WARNING: importing this module opens a database connection.
-
-The process_manager.process_run table belongs to another system and is
-reflected from the database (autoload_with=engine) instead of being declared
-here — keeping a local copy of a shared schema's definition is how drift
-between automations begins. The price of that choice is that the reflection
-happens at import time.
-
-The practical consequence: resources.models and everything that imports it
-(Utils/operation_db and execute) require a reachable PostgreSQL. The project's
-other modules — settings, logs, read_file, Schemas and Modules — import with no
-database at all, and that is why the unit tests can cover them.
+WARNING: importing this module opens a database connection. process_run is
+reflected from the database rather than declared here, because it is shared
+with other automations and provisioned outside this project - keeping a local
+copy of a shared schema is how drift begins. The price is that the reflection
+runs at import time, which is why execute.py wraps its import in a try.
 """
 
 from datetime import datetime, timedelta
@@ -33,16 +26,9 @@ table_registry = registry()
 
 def _ensure_process_run_exists() -> None:
     """
-    Makes sure the central process_manager.process_run table exists before it
-    is reflected.
-
-    process_run is a CENTRAL dependency, shared by several automations and
-    provisioned externally (outside this project's migrations). That is why it
-    is reflected from the database rather than created here — creating a shared
-    table from each bot would lead to schema drift and race conditions.
-
-    This check exists only to fail fast with a clear message if the environment
-    has not been provisioned yet, instead of a raw NoSuchTableError.
+    Fails fast, with a readable message, when process_manager.process_run has
+    not been provisioned - instead of a raw NoSuchTableError from the
+    reflection below.
     """
     insp = inspect(engine)
     if 'process_manager' not in insp.get_schema_names():

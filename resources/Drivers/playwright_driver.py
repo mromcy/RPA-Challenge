@@ -18,26 +18,18 @@ class PlaywrightDriver:
     """
     Drives the RPA Challenge with Playwright.
 
-    It does not inherit from BrowserDriver: conformance to the Protocol is
-    structural.
-
-    The browser only starts on the first call to open(), not in __init__, so
-    that building the driver is cheap and leaves no process hanging if
-    something fails before it is used.
+    Conformance to BrowserDriver is structural, so there is no inheritance. The
+    browser starts on the first open(), not in __init__, so building the driver
+    is cheap and leaves no process hanging if something fails before it is used.
     """
 
     name = 'playwright'
 
     def __init__(self, headless: bool = True, path_browser: str = ''):
         """
-        Args:
-            headless: No visible window. The default for the bot and for the
-                benchmark.
-            path_browser: Browser executable. Empty means use the Chromium
-                Playwright manages itself — see decision 10 in the progress
-                notes. It is deliberately not read from the settings here: the
-                caller assembling the driver decides, which keeps the class
-                testable.
+        An empty path_browser lets Playwright drive the Chromium it manages.
+        It is not read from the settings here - the caller assembling the driver
+        decides, which is what keeps this testable.
         """
         self._headless = headless
         self._path_browser = path_browser
@@ -48,10 +40,7 @@ class PlaywrightDriver:
     @property
     def _active_page(self) -> Page:
         """
-        The active page, with an explicit error if the driver was never opened.
-
-        Without this, using the driver out of order would produce an
-        AttributeError on None, which does not say what to do about it.
+        The page in use, or a readable error if open() was never called.
         """
         if self._page is None:
             raise RuntimeError('Playwright driver not started: call open(url) first.')

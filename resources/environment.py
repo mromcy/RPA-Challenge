@@ -41,22 +41,11 @@ may look like one.
 
 def require_supported_python(version: tuple[int, ...] = RUNNING_VERSION) -> None:
     """
-    Exits with a readable message if the interpreter is outside the range.
+    Stops the process with a readable message on an unsupported interpreter.
 
-    Outside it the problem does not announce itself: the `requirements*.txt`
-    files are exported with markers for that same range, and pip **ignores
-    every line that does not match, installs nothing and still exits with code
-    0** — a deployment that checks the exit code sees success. The failure
-    would only show up later, as a ModuleNotFoundError naming a package instead
-    of the cause.
-
-    Args:
-        version: The version to check. It defaults to the running
-            interpreter's; the parameter exists so the test can simulate
-            another one without a second Python installed.
-
-    Raises:
-        SystemExit: If the running version is outside the supported range.
+    It runs before the other imports because on the wrong version nothing was
+    installed, and the first third-party import would blow up first, hiding the
+    message that says what to do.
     """
     if MINIMUM_VERSION <= version[:2] < FIRST_UNSUPPORTED_VERSION:
         return

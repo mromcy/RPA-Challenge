@@ -10,22 +10,10 @@ from resources.settings import get_settings
 
 class Logs:
     """
-    Logger that writes to the console and to a file, and forwards errors to
-    BotCity Maestro when the run has a task_id.
+    Writes to the console and to a daily file, and forwards errors to Maestro
+    when the run has a task_id.
 
-    The database persistence hook (_save_log_to_db) is still a stub with no
-    effect.
-
-    Parameters:
-        maestro (BotMaestroSDK): SDK used to report errors to Maestro when the
-            run is not local.
-        logger_name (str): Name of the configured logger
-            (default: 'RPA').
-        log_level (int): Minimum level captured
-            (default: logging.INFO).
-        configure_handler (bool): If True, adds console and file handlers
-            (default: True).
-        logger (Logger): A pre-configured Logger instance (optional).
+    `_save_log_to_db` is a stub with no effect.
     """
 
     def __init__(

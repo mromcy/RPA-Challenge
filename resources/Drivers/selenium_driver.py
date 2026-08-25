@@ -1,10 +1,9 @@
 """
 BrowserDriver implementation on top of Selenium WebDriver.
 
-All of the project's Selenium knowledge is confined here, just as the
-Playwright knowledge stays in playwright_driver.py. Both use the same selectors
-and the same time limit, so that the benchmark comparison measures the library
-and not the quality of the code on each side.
+Every bit of Selenium knowledge is confined here. Both drivers share the same
+selectors and the same time limit, so the benchmark measures the library rather
+than the quality of the code on each side.
 """
 
 from collections.abc import Callable
@@ -26,12 +25,9 @@ class SeleniumDriver:
     """
     Drives the RPA Challenge with Selenium WebDriver.
 
-    It does not inherit from BrowserDriver: conformance to the Protocol is
-    structural.
-
-    The browser only starts on the first call to open(), not in __init__, so
-    that building the driver is cheap and leaves no process hanging if
-    something fails before it is used.
+    Conformance to BrowserDriver is structural, so there is no inheritance. The
+    browser starts on the first open(), not in __init__, so building the driver
+    is cheap and leaves no process hanging if something fails before it is used.
     """
 
     name = 'selenium'
@@ -43,17 +39,9 @@ class SeleniumDriver:
         path_driver: str = '',
     ):
         """
-        Args:
-            headless: No visible window. The default for the bot and for the
-                benchmark.
-            path_browser: Browser executable. Empty means letting Selenium use
-                the Chrome installed on the system — see decision 10 in the
-                progress notes. It is deliberately not read from the settings
-                here: the caller assembling the driver decides, which keeps the
-                class testable.
-            path_driver: The chromedriver executable. Empty means letting
-                Selenium Manager download the version matching the browser.
-                Only needed on a machine with no internet access.
+        Empty paths mean defaults: the system Chrome, and the chromedriver
+        Selenium Manager resolves. Neither is read from the settings here — the
+        caller assembling the driver decides, which is what keeps this testable.
         """
         self._headless = headless
         self._path_browser = path_browser
@@ -63,11 +51,9 @@ class SeleniumDriver:
     @property
     def _active_browser(self) -> webdriver.Chrome:
         """
-        The browser in use, with an explicit error if the driver was never
-        opened.
+        The browser in use, or a readable error if open() was never called.
 
-        Without this, using the driver out of order would produce an
-        AttributeError on None, which does not say what to do about it.
+        Without it, using the driver out of order raises AttributeError on None.
         """
         if self._browser is None:
             raise RuntimeError('Selenium driver not started: call open(url) first.')
@@ -79,53 +65,14 @@ class SeleniumDriver:
         selector: str,
     ) -> WebElement:
         """
-        Waits for a condition to hold for the selector and returns the element.
+        Waits for a condition on the selector and returns the element.
 
-        **What this helper does, step by step:**
-
-        1. Builds the locator in the shape Selenium expects — the tuple
-           ``(By.XPATH, selector)``.
-        2. Creates a ``WebDriverWait`` with the project's shared time limit.
-           ``DEFAULT_TIMEOUT_MS`` is in milliseconds, because that is
-           Playwright's unit; Selenium takes seconds, so the conversion happens
-           here. There is a single number in the code base, and it is the one
-           both drivers honour.
-        3. Calls ``.until(condition(locator))``, which **repeats the DOM
-           query** — by default every 0.5 s — until the condition is satisfied
-           or the time runs out. Meanwhile it swallows the exceptions Selenium
-           raises while the element does not exist yet, instead of letting them
-           surface.
-        4. Returns the WebElement, ready to receive the action.
-        5. If the time runs out, it lets the ``TimeoutException`` surface, with
-           a message identifying which wait failed.
-
-        **Why it exists:** in Playwright, `locator.click()` already performs
-        these checks by itself before acting. Selenium has no built-in
-        equivalent, and without a helper like this one every driver method
-        would repeat the same four lines. The waiting layer Playwright hands
-        over ready-made is, here, code somebody has to write and maintain — and
-        that is precisely one of the costs the benchmark sets out to make
-        visible.
-
-        **What it does NOT do, and the comparison has to say so:** Selenium's
-        ready-made conditions cover less than Playwright's check.
-        ``element_to_be_clickable`` guarantees *present*, *visible* and
-        *enabled*, but it guarantees neither *stable* (element at rest, no
-        animation) nor *unobstructed* (nothing on top intercepting the click).
-        Reproducing those two would take custom conditions. Parity between the
-        drivers is therefore approximate — and this is where it falls short.
-
-        Args:
-            condition: A condition factory from the expected_conditions module,
-                for example ``EC.element_to_be_clickable``.
-            selector: The element's XPath, coming from Drivers/selectors.py.
-
-        Returns:
-            WebElement: The element that satisfied the condition.
-
-        Raises:
-            TimeoutException: If the condition does not hold within the time
-                limit.
+        Playwright's actions run these checks themselves; Selenium's do not, so
+        without this helper every method would repeat the same four lines. That
+        is one of the costs the benchmark measures. Parity is approximate:
+        element_to_be_clickable covers present, visible and enabled, but not
+        stable or unobstructed. DEFAULT_TIMEOUT_MS is in milliseconds because
+        that is Playwright's unit; the conversion to seconds happens here.
         """
         wait = WebDriverWait(self._active_browser, DEFAULT_TIMEOUT_MS / 1000)
         return wait.until(condition((By.XPATH, selector)))

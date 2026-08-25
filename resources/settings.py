@@ -1,10 +1,5 @@
 """
-Project settings and management of encrypted credentials.
-
-This module exposes:
-- Settings: loads and validates the config.json fields through Pydantic.
-- get_settings(): a cached factory — the single point of access to the settings.
-- Cryptography: reads and decrypts the credentials stored in secret/.
+Settings loaded from config.json, and the Fernet-encrypted credentials.
 """
 
 from __future__ import annotations
@@ -39,16 +34,12 @@ clones the repo runs with nothing to configure.
 
 def config_path() -> Path:
     """
-    Resolves where to look for config.json.
+    Where to look for config.json.
 
-    The environment variable accepts both the folder and the file — one fewer
-    way to get the machine setup wrong. The distinction is made by the
-    extension, and **not** by consulting the disk: using `is_dir()` would make
-    the value's meaning depend on whether the folder already exists, and a
-    mistyped path would produce an error message pointing at the wrong place.
-
-    Returns:
-        Path: Full path of the configuration file.
+    The environment variable accepts either the folder or the file, and the
+    distinction is made by the extension rather than by asking the disk: using
+    is_dir() would make the value mean different things depending on whether
+    the folder happened to exist, and a typo would point the error elsewhere.
     """
     defined = os.getenv(CONFIG_ENV_VAR)
     if not defined:
@@ -81,14 +72,10 @@ class Settings(BaseSettings):
         """
         Fills in the paths config.json did not supply.
 
-        The derivation is chained, and the order matters: PATH_BASE first,
-        because PATH_IN and PATH_OUT hang off it **already resolved** — if the
-        config declares a PATH_BASE, the input and output folders follow it.
-
-        PATH_BASE falls back to the folder where config.json was found, not to
-        the repository root. That is what lets a single environment variable
-        resolve configuration, credentials, logs and downloads at once: secret/
-        and logs/ are neighbours of the **configuration**, not of the code.
+        Order matters: PATH_BASE first, because the other two hang off it
+        already resolved. PATH_BASE falls back to the folder config.json was
+        found in, not the repository root - that is what lets one environment
+        variable place configuration, credentials, logs and downloads at once.
         """
         if not self.PATH_BASE:
             self.PATH_BASE = str(config_path().parent)
@@ -202,39 +189,20 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """
-    Returns the single Settings instance, reading config.json only once.
+    The single Settings instance, reading config.json only once.
 
-    The whole project should obtain the settings through here, rather than
-    instantiating Settings() directly. That avoids re-reading the file on every
-    call and concentrates the type suppression below in a single point: the
-    fields are required on the class but arrive from the JSON at runtime — the
-    type checker cannot see that source and reports missing arguments.
-
-    The cache can be discarded with ``get_settings.cache_clear()``, which is
-    what the tests use to swap config.json for a fixture one.
-
-    Returns:
-        Settings: The project's validated settings.
+    Everything goes through here rather than instantiating Settings directly,
+    which keeps the disk read to one and concentrates the type suppression in
+    one place. `get_settings.cache_clear()` is the seam the tests use to swap
+    config.json for a fixture one.
     """
     return Settings()  # type: ignore[call-arg]
 
 
 class Cryptography:
     """
-    Management of Fernet-encrypted credentials.
-
-    The credentials live in subfolders of secret/, named after the system they
-    protect. Each subfolder holds credentials.json (fields 'email' and
-    'password') and secret.key.
-
-    Example layout::
-
-        secret/
-        └── db_credentials/
-            ├── credentials.json
-            └── secret.key
-
-    Example::
+    Fernet-encrypted credentials, one subfolder of secret/ per system, each
+    holding credentials.json and secret.key::
 
         user, password = Cryptography().read_credentials('db_credentials')
     """
@@ -253,18 +221,7 @@ class Cryptography:
         self._path_secrets = path_secrets or get_settings().PATH_SECRETS
 
     def __get_key(self, credentials: str) -> bytes:
-        """
-        Loads the Fernet encryption key from the given subfolder.
-
-        Args:
-            credentials: Name of the subfolder (e.g. 'db_credentials').
-
-        Returns:
-            bytes: The encryption key in binary form.
-
-        Raises:
-            FileNotFoundError: If the secret.key file is not found.
-        """
+        """Loads the Fernet key from the given subfolder of secret/."""
         key_path = os.path.join(self._path_secrets, credentials, 'secret.key')
         try:
             with open(key_path, 'rb') as f:
@@ -274,19 +231,7 @@ class Cryptography:
 
     @staticmethod
     def __decrypt(encrypted_value: str, key: bytes) -> str:
-        """
-        Decrypts a value using the supplied Fernet key.
-
-        Args:
-            encrypted_value: The encrypted string, in base64.
-            key: The Fernet key, in bytes.
-
-        Returns:
-            str: The value in clear text.
-
-        Raises:
-            SystemError: If decryption fails.
-        """
+        """Decrypts one base64 value with the supplied Fernet key."""
         try:
             return Fernet(key).decrypt(encrypted_value.encode()).decode()
         except Exception as e:
@@ -294,18 +239,7 @@ class Cryptography:
 
     def read_credentials(self, credentials: str) -> tuple[str, str]:
         """
-        Reads and decrypts the credentials from a specific subfolder.
-
-        Args:
-            credentials: Name of the subfolder inside secret/
-                (e.g. 'db_credentials').
-
-        Returns:
-            tuple[str, str]: (user, password) in clear text.
-
-        Raises:
-            FileNotFoundError: If credentials.json or secret.key is not found.
-            SystemError: If decryption fails.
+        Reads and decrypts (user, password) from a subfolder of secret/.
         """
         try:
             credentials_path = os.path.join(

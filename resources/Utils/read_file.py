@@ -1,10 +1,8 @@
 """
-1 - Module responsible for reading and cleaning the input file.
-2 - Finds .xlsx files in PATH_IN and returns a clean DataFrame.
-3 - Centralises the reading fixes so the execution modules do not repeat them.
+Reads the .xlsx files in PATH_IN and returns one clean DataFrame.
 
-Reading (which depends on the disk) stays in the class; cleaning is the pure
-function clean_dataframe, isolated so it can be tested and reused with no I/O.
+Reading touches the disk and stays in the class; cleaning is the pure function
+clean_dataframe, isolated so it can be tested with no I/O at all.
 """
 
 from pathlib import Path
@@ -17,21 +15,11 @@ from resources.Tools.logs import Logs
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Returns a cleaned version of the DataFrame, leaving the original untouched.
+    A cleaned copy: column names stripped (a hidden space becomes a KeyError
+    three layers down), fully empty rows and columns dropped.
 
-    Fixes applied:
-        - Strip the column names (avoids KeyError from a hidden space)
-        - Drop entirely empty columns
-        - Drop entirely empty rows
-
-    It uses set_axis instead of assigning to df.columns: the assignment would
-    mutate the DataFrame it received, which would stop the function being pure.
-
-    Args:
-        df: DataFrame exactly as it came from the file, uncleaned.
-
-    Returns:
-        The cleaned DataFrame. The original stays intact.
+    set_axis rather than assigning to df.columns, because the assignment would
+    mutate the caller's DataFrame and this function would stop being pure.
     """
     return (
         df
@@ -46,28 +34,17 @@ class FileReader:
 
     def __init__(self, logs: Logs, path_in: str | Path | None = None):
         """
-        Initialises with the input folder.
-
-        Args:
-            logs: Logs instance used to record the operations.
-            path_in: Folder to look for the .xlsx files in. Omitted, it falls
-                back to get_settings().PATH_IN — and only in that case is
-                config.json read, which is what allows testing against a
-                temporary folder.
+        path_in omitted falls back to get_settings().PATH_IN — and *only* in
+        that case is config.json read, which is what lets the tests point this
+        at a temporary folder with no configuration on the machine.
         """
         self.logs = logs
         self.path_in = Path(path_in or get_settings().PATH_IN)
 
     def get_xlsx_files(self) -> list[Path]:
         """
-        Returns the .xlsx files in PATH_IN, from the oldest to the newest.
-
-        Returns:
-            List of Paths for the .xlsx files found.
-
-        Raises:
-            FileNotFoundError: If the PATH_IN folder does not exist, or holds
-                no .xlsx files.
+        The .xlsx files in PATH_IN, oldest first. Raises FileNotFoundError when
+        the folder is missing or holds none — both are setup mistakes.
         """
         if not self.path_in.exists():
             raise FileNotFoundError(f'PATH_IN folder not found: {self.path_in}')
@@ -89,13 +66,7 @@ class FileReader:
 
     def read_file(self) -> pd.DataFrame:
         """
-        Reads the .xlsx files in PATH_IN, cleans them and returns one merged
-        DataFrame.
-
-        The cleaning lives in clean_dataframe.
-
-        Returns:
-            A pandas DataFrame with the cleaned data, ready to use.
+        Every .xlsx in PATH_IN, cleaned and concatenated into one DataFrame.
         """
         dataframes = []
         for file in self.get_xlsx_files():

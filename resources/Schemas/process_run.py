@@ -1,8 +1,5 @@
 """
-Pydantic model representing a process run.
-
-This module defines the data structure used to represent process runs,
-including status, timestamps and metadata.
+Pydantic schema for a process run, plus the run status enum.
 """
 
 import enum
@@ -14,13 +11,11 @@ from pydantic import BaseModel, ConfigDict
 
 class ProcessRunStatus(str, enum.Enum):
     """
-    The states a whole run can be in.
+    The states a whole run moves through.
 
-    It lives here, and not in resources.models, for the same reason
-    ItemRunStatus does: importing models opens a database connection, and
-    naming a status should not cost one. The move was forced by execute.py,
-    which has to name RUNNING, COMPLETED and FAILED even on a machine with no
-    database to record them in.
+    Here rather than in resources.models for the same reason as ItemRunStatus:
+    execute.py has to name RUNNING and COMPLETED even on a machine with no
+    database to record them in, and importing models opens a connection.
     """
 
     SCHEDULED = 'SCHEDULED'
@@ -32,23 +27,8 @@ class ProcessRunStatus(str, enum.Enum):
 
 class ProcessRun(BaseModel):
     """
-    Represents one run of an automated process.
-
-    Attributes:
-        run_id (int): Unique identifier of the run.
-        process_name (str): Name of the process that ran.
-        resource_name (str): Name of the resource responsible for it.
-        scheduled_by (str): User or system that scheduled it.
-        area (str): Area or module the process belongs to.
-        status (str): Current status of the run.
-        latest_stage (str, optional): Last stage recorded.
-        stage_started_at (datetime, optional): When the last stage began.
-        started_at (datetime, optional): Start date and time.
-        ended_at (datetime, optional): End date and time.
-        total_work_time (timedelta, optional): Total run time.
-        error_message (str, optional): Error message, if any.
-        error_stack (str, optional): Error stack trace, where applicable.
-        metadata_ (dict, optional): Additional metadata for the run.
+    One execution of the bot: who started it, on which machine, how it ended and
+    — when it failed — the message and the stack that explain why.
     """
 
     model_config = ConfigDict(from_attributes=True)

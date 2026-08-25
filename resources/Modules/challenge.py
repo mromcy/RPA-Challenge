@@ -1,8 +1,9 @@
 """
-1 - Business flow of the RPA Challenge.
-2 - Talks to the browser exclusively through the BrowserDriver contract.
-3 - Imports neither Playwright nor Selenium: which library drives the screen is
-    a decision for whoever assembles the driver, and this module need not know.
+Business flow of the RPA Challenge.
+
+Talks to the browser only through the BrowserDriver contract and imports
+neither Playwright nor Selenium: which library drives the screen is decided by
+whoever assembles the driver, and this module never finds out.
 """
 
 from resources.Drivers.base import BrowserDriver
@@ -21,10 +22,9 @@ FORM_FIELDS = {
 """
 Label shown on screen → matching attribute on Item.
 
-A data map, rather than seven hand-written calls: adding a field to the form
-becomes one line here, with no driver touched. The labels are the ones the
-challenge actually displays, and they are what the fields are located by — the
-site shuffles their order on every round.
+A data map rather than seven hand-written calls, so adding a field is one line
+and no driver changes. The labels are what the fields are located by, because
+the site shuffles their order on every round.
 """
 
 
@@ -32,11 +32,6 @@ class Challenge:
     """Runs the RPA Challenge flow over any BrowserDriver."""
 
     def __init__(self, driver: BrowserDriver, logs: Logs) -> None:
-        """
-        Args:
-            driver: An already built BrowserDriver implementation.
-            logs: Logs instance used to record the operations.
-        """
         self.driver = driver
         self.logs = logs
 
@@ -60,28 +55,19 @@ class Challenge:
         """
         Fills every field of the form and submits it.
 
-        **The submit is in a finally, and that is the whole point.** The
-        challenge has exactly ten rounds, and the site only advances to the next
-        one when a form is submitted. Submitting only on success would mean that
-        one bad record leaves the page sitting on its round: the next item fills
-        the same form, the tenth is never submitted, the result never appears,
-        and read_result waits out its full timeout before failing the entire
-        run. One unusable record would cost the other nine.
+        **The submit is in a finally, and that is the whole point.** The site
+        has ten fixed rounds and only advances on submit, so submitting only on
+        success would leave a failed record sitting on its round: the next item
+        fills the same form, the tenth is never submitted, and read_result waits
+        out its full timeout. One bad record would cost the other nine.
 
-        Submitting the partial form instead lets the round advance. The site
-        scores those fields as wrong, which is true - the record did fail - and
-        the item is already marked FAILED in the database by the caller. The
-        final success rate reported by the site drops below 100%, and that is
-        the honest outcome rather than a hidden one.
+        Submitting the partial form lets the round advance. The site scores
+        those fields as wrong, which is true, and the final rate drops below
+        100% - the honest outcome rather than a hidden one.
 
-        The submit is guarded because a raise inside a finally **replaces** the
-        original exception. If the browser died mid-field, the real cause is the
-        dead browser, not the submit that followed it - the same reasoning that
-        turns a failed driver.close() into a warning in execute.py.
-
-        Args:
-            item: Pydantic schema holding the current record's data, read from
-                  the item table through get_queued_items_by_run.
+        The submit is itself guarded because a raise inside a finally
+        **replaces** the original exception, and a dead browser is the real
+        cause, not the submit that followed it.
         """
         self.logs.info(f'Filling form: {item.First_Name} {item.Last_Name}.')
 

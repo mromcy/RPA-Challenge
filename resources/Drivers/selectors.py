@@ -1,18 +1,10 @@
 """
 RPA Challenge page selectors, independent of any library.
 
-They live in a module of their own, rather than inside each driver, because
-they describe the **site** and not the **tool**: both drivers attack the same
-page. If each one carried its own copy, a DOM change would have to be fixed in
-two places — and the claim that both use the same location strategy would rest
-on discipline instead of being verifiable.
-
-This matters for the benchmark: with the same strings on both sides, the
-measured time difference cannot be attributed to one driver having been handed
-a better selector than the other.
-
-All of them are semantic — by label or by visible text. No absolute XPath and no
-positional index, both of which break at the slightest rearrangement of the page.
+In a module of their own because they describe the **site**, not the tool: both
+drivers attack the same page. A copy per driver would mean fixing a DOM change
+twice, and the claim that both locate elements the same way would rest on
+discipline instead of being verifiable - which is what the benchmark needs.
 """
 
 XPATH_FIELD_BY_LABEL = "//label[text()='{label}']/following-sibling::input"

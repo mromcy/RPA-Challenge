@@ -1,14 +1,11 @@
 """
 The contract the business flow uses to talk to the browser.
 
-This module imports neither Playwright nor Selenium, and must not. It is the
-only point that both the flow (Modules/challenge.py) and the implementations
-(Drivers/playwright_driver.py, Drivers/selenium_driver.py) can know about
-without dragging a browser library along — which is what makes it possible to
-test the flow with no browser at all.
-
-The operations speak the language of the challenge ("fill the field with this
-label"), not that of the library ("page.locator(...).fill(...)").
+Imports neither Playwright nor Selenium, and must not: it is the only thing the
+flow and both implementations can share without dragging a browser library
+along, which is what lets the flow be tested with no browser at all. The
+operations speak the challenge's language ("fill the field with this label"),
+not the library's.
 """
 
 from typing import Protocol
@@ -17,10 +14,9 @@ DEFAULT_TIMEOUT_MS = 30_000
 """
 The time limit for every wait, in milliseconds, shared by both drivers.
 
-It lives here, rather than inside each implementation, because the benchmark
-comparison only holds if both have the same patience. Different numbers would
-make one give up before the other whenever the site slowed down, and the
-difference would show up in the table as if it were the library's merit.
+Here rather than in each implementation because the comparison only holds if
+both have the same patience: different numbers would make one give up first
+whenever the site slowed down, and the table would read that as library merit.
 """
 
 
@@ -28,17 +24,11 @@ class BrowserDriver(Protocol):
     """
     The operations the challenge needs from a browser.
 
-    A Protocol rather than an abstract base class: conformance is structural,
-    meaning it is enough for the class to have the methods with the right
-    signatures. No implementation has to inherit from this contract or import
-    it — including the FakeDriver used by the tests, which lives in tests/ and
-    knows nothing about resources/.
-
-    Verification is static: what reports a missing method is the type checker,
-    not the interpreter. That is only worth writing down because CI runs one -
-    `mypy` gates every push, next to ruff. Before it did, this paragraph
-    described a check nobody performed, and the Protocol was documentation
-    wearing the costume of a contract.
+    A Protocol, not an abstract base class: conformance is structural, so no
+    implementation inherits from this or imports it — including the tests'
+    FakeDriver, which knows nothing about resources/. What reports a missing
+    method is the type checker, and that is only worth saying because CI runs
+    one: `mypy` gates every push, next to ruff.
     """
 
     name: str
@@ -54,10 +44,8 @@ class BrowserDriver(Protocol):
 
     def fill_field(self, label: str, value: str) -> None:
         """
-        Fills the field identified by the label visible on screen.
-
-        One method for every field, addressed by label, so that the interface
-        does not grow with each new field added to the form.
+        Fills the field identified by the label visible on screen. One method
+        for all of them, so the interface does not grow with the form.
         """
         ...
 
@@ -67,10 +55,8 @@ class BrowserDriver(Protocol):
 
     def read_result(self) -> str:
         """
-        Waits for the final result to appear and returns its text.
-
-        The return type is str and not str | None on purpose: waiting is the
-        implementation's obligation, not the caller's luck.
+        Waits for the final result to appear and returns its text. `str`, not
+        `str | None`: waiting is the implementation's job, not the caller's luck.
         """
         ...
 

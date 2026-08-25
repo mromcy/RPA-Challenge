@@ -1,10 +1,5 @@
 """
-SQLAlchemy engine configuration and session management.
-
-This module exposes:
-- engine: the project-wide SQLAlchemy Engine connected to PostgreSQL.
-- get_session(): a context manager that opens, commits and closes sessions
-  safely.
+SQLAlchemy engine and session management.
 """
 
 from contextlib import contextmanager
@@ -39,20 +34,11 @@ engine = create_engine(
 @contextmanager
 def get_session():
     """
-    Context manager for database sessions.
-
-    Commits automatically when the block exits successfully.
-    Rolls back and re-raises the exception on error.
-
-    Example::
+    A session that commits on the way out and rolls back on an exception::
 
         with get_session() as session:
             session.add(obj)
             session.flush()
-            id_ = obj.id
-
-    Yields:
-        Session: A SQLAlchemy session ready to use.
     """
     session = Session(engine)
     try:
