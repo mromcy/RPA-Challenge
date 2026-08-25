@@ -42,7 +42,19 @@ gap is the form: 3.41 s of the 3.69 s total difference happens while the seven
 fields are being typed. With zero failures on both sides, what separates the
 drivers is speed, not reliability.
 
-→ [Full methodology, mechanism and limitations](#playwright-vs-selenium)
+**The mechanism, and the accident that confirmed it.** Selenium's cost is HTTP
+round trips to `chromedriver`: `element_to_be_clickable` is not one question but
+three, at roughly 15.7 ms each, while Playwright asks the same questions inside
+the browser over one persistent connection. Twenty-two days after the first
+measurement the benchmark was re-run on the same machine, both libraries pinned
+to the same versions. One thing had changed — Chrome 150 to 151, and the
+`chromedriver` that ships with it. Playwright came back within **1.3%**;
+Selenium's fill time fell **23%**. Only the driver that pays for round trips
+noticed, which is what the mechanism predicted.
+
+→ **[The full comparison](docs/playwright-vs-selenium.md)** — speed, complexity,
+flakiness, the isolation experiment, limitations and how to reproduce it. Raw
+output of every run is in [`benchmarks/results/`](benchmarks/results/).
 
 ---
 
@@ -139,10 +151,12 @@ rpa_challenge/
 │       ├── credentials.json        # Fernet-encrypted user and password
 │       └── secret.key              # Fernet key
 ├── migrations/versions/            # Alembic migration history
+├── docs/                           # The long-form analysis this README links to
 ├── benchmarks/
 │   ├── compare_drivers.py          # The measured comparison
 │   ├── mechanism_experiment.py     # Isolates *why* one driver is slower
-│   └── measure_flakiness.py        # Counts flaky runs per driver
+│   ├── measure_flakiness.py        # Counts flaky runs per driver
+│   └── results/                    # Raw output of the published runs
 ├── tests/
 │   ├── conftest.py                 # Shared fixtures; isolates settings cache
 │   ├── fake_driver.py              # Records calls; no browser involved
@@ -173,209 +187,6 @@ rpa_challenge/
     ├── Tools/                      # Logging, BotCity, process_run creation
     └── Utils/                      # Excel reading, item creation, DB operations
 ```
-
----
-
-## Playwright vs Selenium
-
-Both drivers implement the same `BrowserDriver` protocol and are called by the
-same business code. They share the selector strings, the timeout constant and,
-for these measurements, the same Chrome binary. What differs between the two
-columns below is the library, and — as far as this setup can isolate it —
-nothing else.
-
-Each driver is written in **its own documented style**: `WebDriverWait` with
-`expected_conditions` on one side, auto-waiting locators on the other. Neither
-is hand-tuned beyond what its documentation teaches, because the question worth
-answering is not which library can be fastest in expert hands, but what a
-competent developer following normal usage actually gets.
-
-### Speed
-
-Median of 5 runs, min–max in parentheses, warm-up discarded.
-
-| Driver | total (s) | fill (s) | rest (s) |
-|---|---|---|---|
-| **Playwright** | **4.53** (4.47–4.88) | **0.78** (0.76–0.79) | **3.76** (3.67–4.11) |
-| **Selenium** | 8.22 (8.03–8.71) | 4.19 (4.18–4.24) | 3.98 (3.85–4.52) |
-
-`total` is measured here, end to end, and includes launching the browser.
-`fill` is reported by rpachallenge.com itself — an independent measurement,
-immune to where our stopwatch sits. `rest` is the subtraction, and it is
-deliberately **not** called *startup*: it also contains the Start click and the
-final read.
-
-> Subtracting the two medians gives 4.03 s for Selenium, where the table shows
-> 3.98 s. That is not an error: `rest` is subtracted **per run** and the median
-> taken of those five differences, and the median of differences is not the
-> difference of medians. Each column is the median of what it measures.
->
-> The raw output of the run these medians come from — every individual round,
-> the machine, the Chrome build — is committed at
-> [`benchmarks/results/2026-08-25.md`](benchmarks/results/2026-08-25.md).
-
-**The interesting number is `rest`, and it is interesting for not saying
-much.** The medians are 3.76 s and 3.98 s, but the ranges behind them are
-3.67–4.11 and 3.85–4.52: a quarter of a second of shared ground, which is more
-than the 0.22 s that separates the medians. Five runs cannot tell these two
-apart outside the form, and reporting the ordering as a result would be reading
-a coin toss.
-
-What the run does settle is where the difference lives. Of the 3.69 s total gap,
-**3.41 s happens during the fill phase** — 92% of it, while the seven fields are
-being typed. The common assumption that Playwright wins by starting the browser
-faster does not hold here: whatever it wins, it wins at the keyboard.
-
-### Complexity
-
-Only the driver modules count: `base.py` and `selectors.py` are shared and
-belong to neither side.
-
-| Driver | statements | effective lines | explicit waits | `time.sleep` |
-|---|---|---|---|---|
-| **Playwright** | **47** | **55** | **1** | 0 |
-| **Selenium** | 55 | 69 | 4 | 0 |
-
-`statements` counts executable statements from the syntax tree and ignores
-docstrings — it measures how much the program *does*. `effective lines` drops
-docstrings, comments and blank lines — it measures how much you *read*. The two
-differ because a single Selenium call spans more physical lines.
-
-The waits column tells the story better than either size metric. Playwright
-needs one explicit wait in the whole driver, because its actions already wait;
-Selenium has to declare a wait at every interaction, and each of those is a
-place where forgetting produces a flaky test.
-
-### Reliability
-
-The full end-to-end suite, run ten times per driver, one process each:
-
-| Driver | runs | failures |
-|---|---|---|
-| Playwright | 10 | **0** |
-| Selenium | 10 | **0** |
-
-This is the result the comparison needs. It turns *"both drivers are equally
-robust"* from an assertion into a measurement, which is what allows the timing
-difference to be attributed to speed rather than reliability. It was measured on
-the same machine, on the same day as the timings, and the raw output is in
-[`benchmarks/results/2026-08-25.md`](benchmarks/results/2026-08-25.md).
-
-### Where the difference comes from
-
-A number without a mechanism is a blog post. `benchmarks/mechanism_experiment.py`
-isolates one variable at a time by subclassing the production driver. The table
-below is from the 3 August run, on Chrome 150 — read the ratios, not the
-absolute seconds, and see the note underneath it for why:
-
-| Variant | fill (s) | vs. Selenium |
-|---|---|---|
-| Playwright | 0.82 | 0.15× |
-| Selenium | 5.53 | 1.00× |
-| Selenium without any explicit wait | 4.66 | 0.84× |
-| …and without the `clear()` before `send_keys` | 3.56 | 0.64× |
-
-Removing **every** explicit wait recovers only 16%. Removing a single command
-per field — the `clear()`, 70 calls per run — recovers another 20%, which puts
-the cost at roughly **15.7 ms per command exchanged with the browser**.
-
-Reading the Selenium source explains the rest: `element_to_be_clickable` is not
-one question but three. It locates the element, asks whether it is displayed,
-then asks whether it is enabled — each an HTTP round trip to `chromedriver`.
-WebDriverWait is not slow because it waits; it is slow because it asks three
-times.
-
-Playwright runs the same checks, and more, **inside the browser**, and sends one
-command over a persistent connection. It is not that one waits smarter — one
-asks where the DOM is.
-
-Note that even the stripped Selenium variant, which is *not* safe for production
-because it reintroduces races, is still 4.3× slower than Playwright. That
-residue is the protocol.
-
-**Three weeks later the mechanism made a prediction, and kept it.** The timings
-above were re-measured on 25 August, twenty-two days after the first run, on the
-same machine and the same operating system, with `selenium` still at 4.46.0 and
-`playwright` still at 1.59.0. One thing had changed: Chrome had gone from 150 to
-151, taking the matching `chromedriver` with it. Playwright came back within
-1.3% of its old numbers. Selenium's fill time fell **23%**. A new `chromedriver`
-made the round trips cheaper, and only the driver that pays for round trips
-noticed — which is what this section claims the difference is made of.
-
-That is also why the isolation table above has not been re-run: its absolute
-seconds belong to Chrome 150, and the ratios between its variants are what the
-argument rests on. Re-measuring it would move all four rows together and change
-nothing about which variable costs what.
-
-### Methodology
-
-- Machine: AMD64, Windows 11, Python 3.13.5
-- Browser: Chrome 150.0.7871.187, the same binary for both drivers
-- 5 measured runs per driver, headless, first run of each discarded as warm-up
-- Runs interleaved between drivers, not executed in blocks, so that any drift in
-  network or machine load is spread across both
-- Median reported, never the mean: one antivirus spike ruins a mean
-- A failed run aborts the benchmark instead of being silently retried
-- Flakiness measured separately: 10 runs of the real end-to-end suite per driver
-- Date: 2026-08-03
-
-### Limitations
-
-Stated plainly, because the number is only worth what its limits are:
-
-- **This is not a general benchmark of the two libraries.** It measures one flow,
-  on one site, on one machine, on a home network. A different page — heavier
-  DOM, more navigation, fewer form fields — would shift the balance.
-- **The gap scales with the number of interactions, not with time.** This flow
-  performs 81 interactions per run. A flow dominated by page loads rather than
-  field entry would show a much smaller difference.
-- **Wait parity is approximate.** Selenium's `element_to_be_clickable` covers
-  *present*, *visible* and *enabled*, but not *stable* (not animating) and not
-  *unobstructed* (nothing intercepting the click) — two checks Playwright makes
-  before every action. Reproducing them would require custom conditions. See the
-  `_wait_for` docstring in `selenium_driver.py`.
-- **Zero failures out of ten is not zero flakiness.** By the rule of three, no
-  occurrences in N trials bounds the rate at roughly 3/N with 95% confidence —
-  with ten runs, that is 30%. Claiming under 1% would take some three hundred
-  runs.
-- **Reliability here measures these implementations, not the libraries.** A
-  Selenium driver written with `time.sleep` and absolute XPath would fail
-  repeatedly. What separates them is the usage.
-
-### What this means in practice
-
-For this kind of flow — many small interactions with form fields — the cost that
-matters is per-command round-trip, and it compounds with every field. A bot
-filling seventy fields pays it seventy times. If you are choosing a library for
-interaction-heavy automation, that is the number to look at, and it favours
-Playwright by a wide margin.
-
-The corollary matters just as much: if your automation is dominated by page
-loads, downloads or waiting on a backend, most of this difference disappears,
-because browser startup and navigation cost roughly the same on both. Choosing
-on "Playwright is faster" without knowing which half of your runtime dominates
-is choosing on a slogan.
-
-And speed is not the only axis. Selenium's ecosystem, Grid support and the sheer
-volume of existing code are real arguments that this benchmark does not measure.
-
-### Reproducing it
-
-```bash
-poetry run task benchmark                              # timing, N=5
-poetry run python -m benchmarks.mechanism_experiment  # where the time goes
-poetry run python -m benchmarks.measure_flakiness     # reliability
-```
-
-The benchmark refuses to run unless `PATH_BROWSER` is set, because otherwise
-Playwright would drive its own Chromium and Selenium the system Chrome, and part
-of any measured difference would be browser against browser.
-
-The numbers published above are not asked to be taken on trust:
-[`benchmarks/results/`](benchmarks/results/) holds the raw output of the run
-they came from, with every individual round, the machine, the operating system,
-the Python version and the Chrome build. Re-running on different hardware will
-give different numbers — that is the point of writing down which hardware.
 
 ---
 
@@ -410,42 +221,23 @@ cd RPA-Challenge
 
 ### 2. Install dependencies
 
-Poetry is used to *develop* this project. It is **not** required to run it.
-
-**To run the bot** — this is also what the BotCity runner installs:
+Poetry *develops* this project. It is **not** required to run it.
 
 ```bash
 python -m venv .venv
+.venv\Scripts\Activate.ps1     # Windows (PowerShell)
+source .venv/bin/activate      # Linux/macOS
 
-# Windows (PowerShell)
-.venv\Scripts\Activate.ps1
-# Linux/macOS
-source .venv/bin/activate
-
-pip install -r requirements.txt
+pip install -r requirements.txt       # to run the bot; what the BotCity runner installs
+pip install -r requirements-dev.txt   # to develop; adds pytest, ruff, mypy, taskipy
 ```
 
-**To develop, or to run the test suite:**
-
-```bash
-pip install -r requirements-dev.txt   # adds pytest, ruff, mypy, taskipy
-```
-
-```bash
-# or, with Poetry
-poetry install
-```
-
-`requirements-dev.txt` is self-contained: it already includes everything in
-`requirements.txt`, so install one or the other, never both. Both files are
-**generated** from `pyproject.toml` by `task export` and `task export-dev` —
-add dependencies there, not in the `.txt` files.
-
-Those two tasks call `poetry export`, which Poetry 2 no longer ships in its
-core, so run `poetry self add poetry-plugin-export` once before using them. CI
-installs the same plugin, re-exports both files and fails the build if either
-one differs from what `pyproject.toml` produces — which is what keeps the two
-`.txt` files from quietly falling behind.
+Install one or the other, never both — the dev file already contains everything
+in the other. Both are **generated** from `pyproject.toml` by `task export` and
+`task export-dev`, so dependencies go there and not in the `.txt` files. Those
+tasks need `poetry self add poetry-plugin-export` once; CI re-exports both and
+fails the build if either drifted, which is what stops them falling behind
+quietly.
 
 ### 3. Install the browser Playwright manages
 
@@ -485,105 +277,31 @@ committed.
 | `PATH_IN` | no | Input folder; defaults to `<repo>/input` |
 | `PATH_OUT` | no | Output folder; defaults to `<repo>/output` |
 
-The three Maestro fields are structurally required but may hold placeholders
-when running locally — they are only used when the bot logs in to the
-orchestrator.
+There is no BotCity credential here: the bot authenticates with the run token
+the orchestrator hands it on the command line, so no long-lived secret sits at
+rest on the machine.
 
-**On the optional fields, because the defaults are deliberate:**
-
-`PATH_BASE`, `PATH_IN` and `PATH_OUT` are derived from the repository root, so a
-fresh clone runs without configuring a single path. They remain configurable
-because in production input and output folders are typically network shares.
-
-`PATH_BROWSER` empty means each library uses the browser it manages: Playwright
-its own Chromium, Selenium the system Chrome. Filling it makes **both** drivers
-drive that one executable — which is what the benchmark requires, and what
-matches the common corporate practice of pinning an approved browser version.
-
-`PATH_SELENIUM_DRIVER` empty lets Selenium Manager download the `chromedriver`
-matching the browser. It only needs a value on a machine with no internet
-access.
+**The defaults are deliberate.** `PATH_BASE`, `PATH_IN` and `PATH_OUT` derive
+from the repository root, so a fresh clone runs without configuring a single
+path — they stay configurable because production folders are usually network
+shares. `PATH_BROWSER` empty lets each library use the browser it manages;
+filling it points **both** at one executable, which the benchmark requires and
+which matches the corporate habit of pinning an approved version.
+`PATH_SELENIUM_DRIVER` empty lets Selenium Manager fetch the matching
+`chromedriver`, and only needs a value on a machine with no internet access.
 
 `logs/`, `downloads/` and `secret/` are created on first use.
 
-### When the code runs from somewhere else
+### Where the configuration lives, and the credentials
 
-By default the bot looks for `config.json` next to itself, which covers running
-from a clone. An orchestrator does not work that way: it downloads the packaged
-bot, extracts it into a working directory of its own, and runs it from there —
-where no configuration exists.
+`config.json` is looked for beside the code, or wherever `RPA_CHALLENGE_CONFIG`
+points — which is what lets an orchestrator run the bot from a temporary folder.
+Database credentials are never stored in it: they live encrypted with Fernet
+under `secret/`, which `.gitignore` keeps out of the repository.
 
-One environment variable covers that. On Windows, from an **elevated**
-PowerShell — machine scope, because a service runs under its own account and
-would not see a user-scoped variable:
-
-```powershell
-[Environment]::SetEnvironmentVariable(
-    'RPA_CHALLENGE_CONFIG', 'C:\path\to\the\project', 'Machine'
-)
-```
-
-On Linux or macOS, in the service unit or the shell profile:
-
-```bash
-export RPA_CHALLENGE_CONFIG=/path/to/the/project
-```
-
-Processes read the environment when they start, so restart the runner — and
-open a new terminal — before testing.
-
-It accepts either the folder or the file, decided by whether the path has an
-extension, never by touching the disk. And because `PATH_BASE` defaults to
-**the folder the configuration was found in**, that single variable also
-relocates `secret/`, `logs/` and `downloads/` — they belong next to the
-configuration, not next to the code. Unset, everything falls back to the
-repository root and a fresh clone needs no configuration at all.
-
----
-
-### Database credentials (encrypted)
-
-PostgreSQL credentials are stored encrypted with
-[Fernet](https://cryptography.io/en/latest/fernet/) under `secret/`:
-
-```
-secret/
-└── db_credentials/
-    ├── credentials.json   ← {"email": "<encrypted>", "password": "<encrypted>"}
-    └── secret.key         ← Fernet key (binary)
-```
-
-To generate them:
-
-```python
-import json
-import os
-
-from cryptography.fernet import Fernet
-
-key = Fernet.generate_key()
-fernet = Fernet(key)
-
-os.makedirs('secret/db_credentials', exist_ok=True)
-
-with open('secret/db_credentials/secret.key', 'wb') as f:
-    f.write(key)
-
-with open('secret/db_credentials/credentials.json', 'w') as f:
-    json.dump(
-        {
-            'email': fernet.encrypt(b'your_user').decode(),
-            'password': fernet.encrypt(b'your_password').decode(),
-        },
-        f,
-    )
-```
-
----
+→ **[The environment variable, and how to create the encrypted credentials](docs/configuration.md)**
 
 ## Database and migrations
-
-Create the database and the schemas:
 
 ```sql
 CREATE DATABASE <database_name>;
@@ -592,19 +310,16 @@ CREATE SCHEMA IF NOT EXISTS rpa_challenge;
 CREATE SCHEMA IF NOT EXISTS process_manager;
 ```
 
-Then apply the migrations:
-
 ```bash
 alembic upgrade head
 ```
 
-This creates `rpa_challenge.item_run` (per-item tracking) and
-`rpa_challenge.item` (form data and result). `process_manager.process_run` is
-managed outside this project.
+That creates `rpa_challenge.item_run` (the queue) and `rpa_challenge.item` (form
+data and result); `process_manager.process_run` is provisioned outside this
+project, because it is shared with other automations.
 
-> `bot.py` runs `alembic upgrade head` itself before starting, so this step is
-> only needed when setting the database up by hand. It skips the migrations when
-> there is no database to migrate.
+> `bot.py` applies the migrations itself before starting, and skips them when
+> there is no database — so this section is only for setting one up by hand.
 
 ### Running without a database
 
@@ -717,303 +432,51 @@ the live one.
 | unit | 95 | nothing | ~2 s |
 | e2e | 2 | network + browser | ~20 s |
 
-**Why they are separated.** The end-to-end tests depend on a system nobody here
-controls: the site can go down, change its DOM, or simply be slow. Running them
-on every push produces red builds for reasons unrelated to the code, and a team
-that sees red often enough learns to answer it with "run it again" — including
-the day the red is real. The live lane belongs on a schedule and on demand, not
-on every commit.
-
-**That separation is what `.github/workflows/ci.yml` implements.** The fast lane,
-`mypy`, and a check that the exported `requirements*.txt` still match
-`pyproject.toml` gate every push and pull request. The fast lane runs on 3.11 and 3.13, the ends
-of the supported range, because compatibility breaks at the edges. The live lane runs Monday mornings and from
-the Actions tab, never on a push, as two jobs — one per driver — so a failure
-names the driver that broke without anyone opening a log.
-
-**The type checker is what makes the `BrowserDriver` Protocol a contract.**
-Structural conformance is checked statically or not at all, so `mypy` runs in CI
-next to ruff. Turning it on paid for itself immediately: `warn_unused_ignores`
-found that **11 of the project's 22 `# type: ignore` comments suppressed
-nothing** — they had been written for the editor's checker and carried error
-codes that no tool ever read. They are gone.
+The end-to-end tests reach a site nobody here controls, so they never gate a
+push: red builds for reasons unrelated to the code teach a team to answer red
+with "run it again" — including the day the red is real. The fast lane, `mypy`
+and a check that the exported `requirements*.txt` still match `pyproject.toml`
+gate every push; the live lane runs Monday mornings and on demand.
 
 **The fast lane needs no configuration at all.** No database, no `config.json`,
-no browser. That is a property held on purpose, and two tests assert it by
-checking that the settings cache was never touched. A `conftest.py` fixture
-clears that cache around every test, so results never depend on execution order.
+no browser — a property two tests assert by checking that the settings cache was
+never touched.
 
-### What the coverage number means
+→ **[How the suite is built, and what its coverage number means](docs/testing.md)**
+— the fake driver, the architecture guard, why there is no `--cov-fail-under`,
+and what the type checker found when it was switched on.
 
-The fast lane reports about **63%** of `resources`, and that figure is still
-dominated by code it cannot reach by design. Of the 315 uncovered statements,
-**218 sit in five modules that need a live PostgreSQL just to be imported** —
-`operation_db`, `models`, `add_process_run`, `create_items` and `database`.
-Another 66 are in the two browser drivers, which the live lane covers instead.
-That leaves **31** statements genuinely uncovered and reachable. The code that
-needs neither a database nor a browser sits at roughly **94%**.
-
-> Every number here is measured the way CI runs the suite: **no `config.json`,
-> no `secret/`, no database**. The condition matters — on a clone that does have
-> a `config.json`, one more statement in `settings.py` gets covered and the
-> totals read 314 and 30 instead. To reproduce exactly what this paragraph
-> claims, run it somewhere none of those three exist, and with the
-> `RPA_CHALLENGE_CONFIG` environment variable unset.
-
-`execute.py` used to be the sixth name on that list, and the orchestrator having
-no unit tests used to be recorded here as a known cost. It left the list when
-the database became optional: the imports that open a connection now sit inside
-a `try`, so the module loads on a machine with neither configuration nor
-PostgreSQL. `tests/test_execute.py` then drove the whole `Execute` class from
-the top — a spreadsheet on disk, a fake browser, no network — and took it from
-0% to **96%**, the remainder being the import lines that can only run where a
-database exists.
-
-**Watch the two figures move in opposite directions on the way there.** Making
-the database optional pushed the overall number **up** (48% → 53%) while pushing
-"the code that needs neither a database nor a browser" **down** (~85% → ~78%):
-ninety-two statements left the bucket that was excused from measurement and
-entered the one that is measured, arriving untested. Writing the tests then
-moved both up together (53% → 63%, ~78% → ~94%). One metric, two directions,
-from a change that only ever improved the codebase — which is the whole argument
-of the next paragraph.
-
-The tests earned something the percentage does not show, too. Four behaviours in
-`execute.py` existed only as prose: that the browser is closed even when the
-challenge blows up, that a failure *while closing* must not replace the real
-error, that a failure *while counting* must not mask the exception being
-reported, and that the numbers sent to the orchestrator come from the item store
-rather than from a counter in memory. Each was verified by breaking it on
-purpose and confirming exactly one test objected.
-
-The reason the remaining five need a database at import time is a deliberate
-trade.
-`models.py` **reflects** `process_manager.process_run` from the database instead
-of declaring it here, because that table is shared with other automations and
-provisioned outside this project — keeping a local copy of a shared schema's
-definition is how drift between systems begins. The price is that the reflection
-runs on import, and pulls a connection with it. Reversing the trade means
-building the engine lazily and deferring the reflection, which changes how every
-database session in the project is obtained: worth doing deliberately, not
-casually. The optional-database fallback does not reverse it — it routes around
-it, which is why those five modules are still unreachable here while the
-orchestrator that used to import them is now covered like any other module.
-
-There is deliberately **no `--cov-fail-under`**. A global percentage here moves
-mostly when database-bound code is added or removed, not when tests are — adding
-a correct new repository module would *lower* it and break the build. And it is
-too coarse to catch what it would exist to catch: business logic added to
-`challenge.py` without a test is four or five statements against a denominator of
-849, half a percentage point that no sane threshold would trip on. Coverage is
-read here as a report, not enforced as a gate.
-
-**The end-to-end test is one test, parametrised over both drivers.** Same
-assertions, two browser backends — which is what cross-browser testing is. It
-builds the drivers directly rather than through the factory: going through the
-factory would apply the configured `PATH_BROWSER`, and once that is set both
-cases would collapse onto the same browser and the cross-browser coverage would
-vanish with every test still green.
-
-**One test guards the architecture.** It runs a subprocess that imports the
-business flow and asserts that no browser module was loaded — the property that
-makes the driver abstraction real rather than decorative. Adding
-`from playwright.sync_api import Page` to `challenge.py` turns that test, and
-only that test, red.
-
-**A fake driver replaces the browser.** `tests/fake_driver.py` records the calls
-it receives, which turns *"the bot filled all seven fields with the right
-values"* into a dictionary assertion that runs in milliseconds. It neither
-inherits from nor imports the protocol — structural conformance is what makes
-that possible.
-
-Every test here was validated by breaking the code it covers on purpose and
-confirming it turns red. A test that cannot fail proves nothing — and a suite
-that has never been seen failing is an assumption, not evidence.
-
----
-
-## Execution flow in detail
+## Execution flow
 
 ```
-bot.py
-  ├── parse --driver and remove it from sys.argv
-  ├── alembic upgrade head                     (only when there is a database)
-  └── Execute(driver).execute()
-        │
-        ├── 1. BotMaestroSDK.from_sys_args()
-        │      Reads the orchestrator arguments positionally.
-        │      Fewer than four means local mode: task_id = None
-        │
-        ├── 2. AddProcessRun().execute()                      [database only]
-        │      Inserts process_run with status SCHEDULED, returns run_id.
-        │      With no database, run_id is 0 and a WARNING is logged
-        │
-        ├── 3. update_process_run_status(RUNNING)
-        │
-        ├── 4. read_data(logs) → FileReader(...).read_file()
-        │      Reads every .xlsx in input/, oldest first,
-        │      applies clean_dataframe and concatenates
-        │
-        ├── 5. create_items(df, run_id)                       [database only]
-        │      For each row: ORMItemRun (QUEUED) + ORMItem with the form data
-        │
-        ├── 6. get_queued_items_by_run(run_id)                [database only]
-        │      Steps 5 and 6 are the round trip through the queue. With no
-        │      database, items_from_dataframe(df) builds the same objects
-        │      straight from the spreadsheet and steps 5-6 do not happen
-        │
-        ├── 7. create_driver(...) → run_challenge(driver, logs, items, url, db)
-        │      Launches the browser through the selected driver
-        │      Opens the site and clicks Start
-        │      For each item:
-        │        ├── update_item_run_status(PROCESSING)
-        │        ├── fills the seven fields, located by label
-        │        ├── submits
-        │        └── update_item_run_status(COMPLETED | FAILED)
-        │      Reads the final success rate and stores it per item
-        │      Returns that text. Deliberately **not** the counts:
-        │      those are read back from the item store, which keeps
-        │      being right when a failure interrupts the loop
-        │
-        ├── 8. driver.close() in a finally block
-        │      A cleanup failure is logged as a warning, never allowed to
-        │      mask the original error
-        │
-        ├── 9. update_process_run_status(COMPLETED)
-        │
-        └── 10. maestro.finish_task(SUCCESS, total, processed, failed)
-                Only when a task_id is present.
-                On any exception: finish_task(FAILED) + process_run(FAILED)
-                with the message and the full stack trace stored in the database
+Excel → run record → queue → browser → result
 ```
 
----
+Read the spreadsheet, write one row per record, process the queue one item at a
+time updating its state as it goes, then close the run. Both the run record and
+the queue are skipped when there is no database.
 
-## BotCity Maestro integration
+→ **[Step by step, with what each layer does](docs/execution-flow.md)** and the
+**[data model](docs/data-model.md)** behind it.
 
-The bot runs identically with or without the orchestrator.
+## BotCity Maestro
 
-`BotMaestroSDK.from_sys_args()` inspects the command line: when the runner
-started the process it finds the server, task id, token and organization there
-and connects; otherwise it falls back to a local instance with `task_id = None`,
-and every Maestro call is skipped.
+The bot runs identically with or without the orchestrator: with fewer than four
+command-line arguments the SDK returns a local instance and no call to Maestro
+has any effect. Connected, it reports the outcome with total, processed and
+failed counts, and distinguishes a run that finished with some items failing
+from one that never finished.
 
-Because those arguments are read **by position**, `--driver` is parsed and
-removed from `sys.argv` before the SDK sees it — otherwise a flag written before
-them would shift every position and the bot would try to reach a server named
-`--driver`.
-
-### Packaging for the runner
-
-The runner extracts the package into a directory of its own — on Windows,
-something like `…\BotCity\run\temp\` — so the package needs the code and
-nothing else:
-
-```
-resources/  migrations/  bot.py  alembic.ini  requirements.txt
-```
-
-Configuration, credentials and input folders stay on the machine and are found
-through `RPA_CHALLENGE_CONFIG`, which keeps secrets out of the distributed
-artifact entirely. Set the variable once on the machine that hosts the runner
-and every deployment after that carries only code.
-
-### Choosing the driver from the panel
-
-The driver is resolved in three layers, most specific first:
-
-| Source | When it wins |
-|---|---|
-| `--driver` on the command line | Always, when present |
-| `driver` task parameter in Maestro | When the task supplies one |
-| `DRIVER` in `config.json` | Default for the machine |
-
-So an operator can trigger the same registered automation with
-`driver = selenium` as a task parameter and get the Selenium run — no redeploy,
-no second automation, no editing a file on the robot. An unknown value fails
-immediately, before the migrations run and before the execution is recorded, so
-a typo in the panel leaves no half-finished run behind.
-
-### What is reported
-
-| Event | SDK call | When |
-|---|---|---|
-| Successful completion | `finish_task(SUCCESS)` | Run finished, no item failed |
-| Completed with failures | `finish_task(PARTIALLY_COMPLETED)` | Queue finished, some items errored |
-| Failed run | `finish_task(FAILED)` | The run did not reach the end |
-| Error detail | `maestro.error()` | `logs.error()` called with an exception |
-
-`finish_task` carries `total_items`, `processed_items` and `failed_items`, which
-show up in the Maestro panel.
-
-### No credentials to store
-
-The bot authenticates with the execution token the runner hands it on the
-command line, so **there is no BotCity API key anywhere in the configuration**
-and nothing to rotate on the robot machine. A stored API key would only be
-needed by a process that *calls* the orchestrator instead of being called by it
-— an internal portal that creates tasks, a folder watcher, a CI pipeline — and
-this bot is never in that position.
-
----
+→ **[Packaging, driver selection from the panel, and what gets reported](docs/botcity.md)**
 
 ## Data model
 
-### `process_run` (schema `process_manager`)
+Three tables: `process_manager.process_run` (one row per execution, shared with
+other automations and provisioned outside this project), `rpa_challenge.item_run`
+(one row per record — this is the queue) and `rpa_challenge.item` (the form data
+and the result).
 
-One row per execution of the bot.
-
-| Column | Type | Description |
-|---|---|---|
-| `run_id` | INT (PK) | Execution identifier |
-| `process_name` | VARCHAR | Process name |
-| `resource_name` | VARCHAR | Hostname of the machine that ran it |
-| `scheduled_by` | VARCHAR | OS user that started it |
-| `area` | VARCHAR | Owning area |
-| `status` | ENUM | `SCHEDULED → RUNNING → COMPLETED / FAILED / CANCELED` |
-| `started_at` / `ended_at` | TIMESTAMP | Start and end |
-| `total_work_time` | INTERVAL | Duration |
-| `error_message` | TEXT | Error message, when it failed |
-| `error_stack` | TEXT | Full stack trace, when it failed |
-
-### `item_run` (schema `rpa_challenge`)
-
-One row per record, tracked individually — this is the queue.
-
-| Column | Type | Description |
-|---|---|---|
-| `item_id` | INT (PK) | Item identifier |
-| `run_id` | INT (FK) | Parent execution |
-| `item_key` | VARCHAR | Business key for the item |
-| `status` | ENUM | `QUEUED → PROCESSING → COMPLETED / FAILED` |
-| `attempt` | INT | Attempt count |
-| `created_at` / `started_at` / `completed_at` | TIMESTAMP | Lifecycle timestamps |
-| `total_work_time` | INTERVAL | Processing time |
-| `exception_reason` | VARCHAR | Why it failed |
-
-### `item` (schema `rpa_challenge`)
-
-The form data and the outcome.
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | INT (PK) | Row identifier |
-| `item_id` | INT (FK) | Reference to `item_run` |
-| `First_Name` … `Phone_Number` | VARCHAR | The seven form fields |
-| `result` | VARCHAR | Success rate reported by the site |
-
-### Status transitions
-
-```
-process_run:  SCHEDULED → RUNNING → COMPLETED
-                                  ↘ FAILED
-                                  ↘ CANCELED
-
-item_run:     QUEUED → PROCESSING → COMPLETED
-                                  ↘ FAILED
-```
-
----
+→ **[Columns, status transitions and how they relate](docs/data-model.md)**
 
 ## Logs
 
