@@ -30,16 +30,17 @@ against the same Chrome build, on the same machine. Median of 5 runs.
 
 | | Playwright | Selenium | |
 |---|---|---|---|
-| End-to-end time | **4.59 s** | 9.50 s | 2.1× |
-| Form filling only | **0.81 s** | 5.45 s | 6.7× |
+| End-to-end time | **4.53 s** | 8.22 s | 1.8× |
+| Form filling only | **0.78 s** | 4.19 s | 5.4× |
 | Explicit waits in the driver | **1** | 4 | |
 | Failures in 10 end-to-end runs | **0** | **0** | |
 
-The interesting number is the one that barely moves: everything *except*
-filling — launching the browser, navigating, reading the result — takes 3.78 s
-against 4.42 s. Ninety-four percent of the gap happens during the interactions,
-not at startup. And with zero failures on both sides, the difference is speed,
-not reliability.
+The interesting number is the one that barely moves. Everything *except*
+filling — launching the browser, navigating, reading the result — takes 3.76 s
+against 3.98 s, and those two figures overlap once you look at the spread. The
+gap is the form: 3.41 s of the 3.69 s total difference happens while the seven
+fields are being typed. With zero failures on both sides, what separates the
+drivers is speed, not reliability.
 
 → [Full methodology, mechanism and limitations](#playwright-vs-selenium)
 
@@ -195,8 +196,8 @@ Median of 5 runs, min–max in parentheses, warm-up discarded.
 
 | Driver | total (s) | fill (s) | rest (s) |
 |---|---|---|---|
-| **Playwright** | **4.59** (4.47–5.03) | **0.81** (0.69–0.82) | **3.78** (3.75–4.21) |
-| **Selenium** | 9.50 (9.28–10.85) | 5.45 (4.83–5.50) | 4.42 (3.98–5.35) |
+| **Playwright** | **4.53** (4.47–4.88) | **0.78** (0.76–0.79) | **3.76** (3.67–4.11) |
+| **Selenium** | 8.22 (8.03–8.71) | 4.19 (4.18–4.24) | 3.98 (3.85–4.52) |
 
 `total` is measured here, end to end, and includes launching the browser.
 `fill` is reported by rpachallenge.com itself — an independent measurement,
@@ -204,16 +205,26 @@ immune to where our stopwatch sits. `rest` is the subtraction, and it is
 deliberately **not** called *startup*: it also contains the Start click and the
 final read.
 
-> Subtracting the two medians in the table gives 4.05 s for Selenium, not 4.42 s.
-> That is not an error: `rest` is subtracted **per run** and the median taken of
-> those five differences, and the median of differences is not the difference of
-> medians. Each column is the median of what it measures.
+> Subtracting the two medians gives 4.03 s for Selenium, where the table shows
+> 3.98 s. That is not an error: `rest` is subtracted **per run** and the median
+> taken of those five differences, and the median of differences is not the
+> difference of medians. Each column is the median of what it measures.
+>
+> The raw output of the run these medians come from — every individual round,
+> the machine, the Chrome build — is committed at
+> [`benchmarks/results/2026-08-25.md`](benchmarks/results/2026-08-25.md).
 
-**The interesting number is `rest`.** Launching the browser and navigating costs
-roughly the same on both sides — 3.78 s against 4.42 s, 17% apart. Of the 4.91 s
-total difference, 4.64 s comes from the fill phase. Ninety-four percent of the
-gap happens during the interactions, so the common assumption that Playwright
-wins on browser startup does not hold for this flow.
+**The interesting number is `rest`, and it is interesting for not saying
+much.** The medians are 3.76 s and 3.98 s, but the ranges behind them are
+3.67–4.11 and 3.85–4.52: a quarter of a second of shared ground, which is more
+than the 0.22 s that separates the medians. Five runs cannot tell these two
+apart outside the form, and reporting the ordering as a result would be reading
+a coin toss.
+
+What the run does settle is where the difference lives. Of the 3.69 s total gap,
+**3.41 s happens during the fill phase** — 92% of it, while the seven fields are
+being typed. The common assumption that Playwright wins by starting the browser
+faster does not hold here: whatever it wins, it wins at the keyboard.
 
 ### Complexity
 
@@ -246,12 +257,16 @@ The full end-to-end suite, run ten times per driver, one process each:
 
 This is the result the comparison needs. It turns *"both drivers are equally
 robust"* from an assertion into a measurement, which is what allows the timing
-difference to be attributed to speed rather than reliability.
+difference to be attributed to speed rather than reliability. It was measured on
+the same machine, on the same day as the timings, and the raw output is in
+[`benchmarks/results/2026-08-25.md`](benchmarks/results/2026-08-25.md).
 
 ### Where the difference comes from
 
 A number without a mechanism is a blog post. `benchmarks/mechanism_experiment.py`
-isolates one variable at a time by subclassing the production driver:
+isolates one variable at a time by subclassing the production driver. The table
+below is from the 3 August run, on Chrome 150 — read the ratios, not the
+absolute seconds, and see the note underneath it for why:
 
 | Variant | fill (s) | vs. Selenium |
 |---|---|---|
@@ -277,6 +292,20 @@ asks where the DOM is.
 Note that even the stripped Selenium variant, which is *not* safe for production
 because it reintroduces races, is still 4.3× slower than Playwright. That
 residue is the protocol.
+
+**Three weeks later the mechanism made a prediction, and kept it.** The timings
+above were re-measured on 25 August, twenty-two days after the first run, on the
+same machine and the same operating system, with `selenium` still at 4.46.0 and
+`playwright` still at 1.59.0. One thing had changed: Chrome had gone from 150 to
+151, taking the matching `chromedriver` with it. Playwright came back within
+1.3% of its old numbers. Selenium's fill time fell **23%**. A new `chromedriver`
+made the round trips cheaper, and only the driver that pays for round trips
+noticed — which is what this section claims the difference is made of.
+
+That is also why the isolation table above has not been re-run: its absolute
+seconds belong to Chrome 150, and the ratios between its variants are what the
+argument rests on. Re-measuring it would move all four rows together and change
+nothing about which variable costs what.
 
 ### Methodology
 
@@ -341,6 +370,12 @@ poetry run python -m benchmarks.measure_flakiness     # reliability
 The benchmark refuses to run unless `PATH_BROWSER` is set, because otherwise
 Playwright would drive its own Chromium and Selenium the system Chrome, and part
 of any measured difference would be browser against browser.
+
+The numbers published above are not asked to be taken on trust:
+[`benchmarks/results/`](benchmarks/results/) holds the raw output of the run
+they came from, with every individual round, the machine, the operating system,
+the Python version and the Chrome build. Re-running on different hardware will
+give different numbers — that is the point of writing down which hardware.
 
 ---
 
