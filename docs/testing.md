@@ -102,7 +102,7 @@ mostly when database-bound code is added or removed, not when tests are — addi
 a correct new repository module would *lower* it and break the build. And it is
 too coarse to catch what it would exist to catch: business logic added to
 `challenge.py` without a test is four or five statements against a denominator of
-849, half a percentage point that no sane threshold would trip on. Coverage is
+850, half a percentage point that no sane threshold would trip on. Coverage is
 read here as a report, not enforced as a gate.
 
 **The end-to-end test is one test, parametrised over both drivers.** Same
