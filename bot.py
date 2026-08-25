@@ -36,9 +36,15 @@ if __name__ == '__main__':
         from alembic import command
         from alembic.config import Config
 
-        from resources.execute import Execute
+        from resources.execute import DATABASE, Execute
 
-        command.upgrade(Config('alembic.ini'), 'head')
+        # The migrations only make sense where there is something to migrate.
+        # Running them unconditionally would take the process down on the very
+        # machine the fallback exists for - and it would do so before Execute
+        # had the chance to say, in the log, why it is running without one.
+        if DATABASE:
+            command.upgrade(Config('alembic.ini'), 'head')
+
         executor = Execute(maestro, driver)
     except Exception as error:
         report_failure(maestro, error)

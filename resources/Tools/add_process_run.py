@@ -13,7 +13,8 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from resources.database import get_session
-from resources.models import ORMProcessRun, ProcessRunStatus
+from resources.models import ORMProcessRun
+from resources.Schemas.process_run import ProcessRunStatus
 from resources.settings import get_settings
 
 _TZ = ZoneInfo('America/Fortaleza')

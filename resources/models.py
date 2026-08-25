@@ -15,7 +15,6 @@ other modules — settings, logs, read_file, Schemas and Modules — import with
 database at all, and that is why the unit tests can cover them.
 """
 
-import enum
 from datetime import datetime, timedelta
 
 from sqlalchemy import ForeignKey, Interval, MetaData, Table, inspect
@@ -82,14 +81,6 @@ class ORMProcessRun:
 
 
 schema_name = get_settings().DB_SCHEMA
-
-
-class ProcessRunStatus(str, enum.Enum):
-    SCHEDULED = 'SCHEDULED'
-    RUNNING = 'RUNNING'
-    COMPLETED = 'COMPLETED'
-    FAILED = 'FAILED'
-    CANCELED = 'CANCELED'
 
 
 @table_registry.mapped_as_dataclass

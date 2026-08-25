@@ -18,9 +18,10 @@ def driver_from_parameters(parameters: Mapping[str, object]) -> str | None:
     Reads the driver from the parameters of a BotCity Maestro task.
 
     It allows choosing the library when firing the task from the panel, with no
-    redeploy and without registering a second automation. It lives here, and
-    not in execute.py, because that module cannot be imported without a
-    database — the rule would be out of reach of the unit suite.
+    redeploy and without registering a second automation. It lives here, and not
+    in execute.py, because this is the module that owns the driver names — the
+    original reason was that execute.py could not be imported without a
+    database, which stopped being true when the database became optional.
 
     Args:
         parameters: The run's parameter dictionary. Empty in local mode.

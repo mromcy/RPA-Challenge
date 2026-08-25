@@ -24,15 +24,9 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import NoResultFound
 
 from resources.database import get_session
-from resources.models import (
-    ItemRunStatus,
-    ORMItem,
-    ORMItemRun,
-    ORMProcessRun,
-    ProcessRunStatus,
-)
+from resources.models import ItemRunStatus, ORMItem, ORMItemRun, ORMProcessRun
 from resources.Schemas.item_run import Item, ItemInfo, ItemRun
-from resources.Schemas.process_run import ProcessRun
+from resources.Schemas.process_run import ProcessRun, ProcessRunStatus
 
 # Default timezone for every timestamp recorded in the database
 _TZ = ZoneInfo('America/Fortaleza')

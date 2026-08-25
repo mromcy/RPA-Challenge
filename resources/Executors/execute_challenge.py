@@ -23,7 +23,12 @@ from resources.Utils.read_file import FileReader
 # including by the tests, which pass a stand-in instead. The
 # from __future__ import annotations above is what lets the annotation survive
 # without the import: it is not evaluated at runtime.
+#
+# NoDatabase is the stand-in used when there is no database to talk to. It
+# appears here only so the annotation states the truth - both are accepted, and
+# this module never asks which one it got.
 if TYPE_CHECKING:
+    from resources.execute import NoDatabase
     from resources.Utils.operation_db import OperationDb
 
 
@@ -49,7 +54,7 @@ def run_challenge(
     logs: Logs,
     items: list[ItemInfo],
     url: str,
-    db: OperationDb,
+    db: OperationDb | NoDatabase,
 ) -> str:
     """
     Runs the complete RPA Challenge flow: navigates to the URL, starts the
@@ -71,7 +76,9 @@ def run_challenge(
         logs: Logs instance used to record the operations.
         items: List of ItemInfo read from the database with status QUEUED.
         url: The RPA Challenge URL.
-        db: OperationDb instance used to update the status of each item.
+        db: Used to update the status of each item. OperationDb writes them to
+            PostgreSQL; NoDatabase only tallies them. This function does not
+            care which one it received.
 
     Returns:
         str: The text the site itself reports at the end. It travels up to the

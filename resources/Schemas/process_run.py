@@ -5,10 +5,29 @@ This module defines the data structure used to represent process runs,
 including status, timestamps and metadata.
 """
 
+import enum
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict
+
+
+class ProcessRunStatus(str, enum.Enum):
+    """
+    The states a whole run can be in.
+
+    It lives here, and not in resources.models, for the same reason
+    ItemRunStatus does: importing models opens a database connection, and
+    naming a status should not cost one. The move was forced by execute.py,
+    which has to name RUNNING, COMPLETED and FAILED even on a machine with no
+    database to record them in.
+    """
+
+    SCHEDULED = 'SCHEDULED'
+    RUNNING = 'RUNNING'
+    COMPLETED = 'COMPLETED'
+    FAILED = 'FAILED'
+    CANCELED = 'CANCELED'
 
 
 class ProcessRun(BaseModel):
