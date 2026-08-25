@@ -132,14 +132,16 @@ nothing about which variable costs what.
 ## Methodology
 
 - Machine: AMD64, Windows 11, Python 3.13.5
-- Browser: Chrome 150.0.7871.187, the same binary for both drivers
+- Browser: Chrome 151.0.7922.174 for the timings and the flakiness runs;
+  Chrome 150.0.7871.187 for the isolation table, which was measured earlier and
+  is deliberately not re-run — see above
 - 5 measured runs per driver, headless, first run of each discarded as warm-up
 - Runs interleaved between drivers, not executed in blocks, so that any drift in
   network or machine load is spread across both
 - Median reported, never the mean: one antivirus spike ruins a mean
 - A failed run aborts the benchmark instead of being silently retried
 - Flakiness measured separately: 10 runs of the real end-to-end suite per driver
-- Date: 2026-08-03
+- Date: 2026-08-25 for the timings and flakiness; 2026-08-03 for the isolation table
 
 ## Limitations
 

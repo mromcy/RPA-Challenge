@@ -134,11 +134,11 @@ def test_input_and_output_follow_a_declared_path_base(fake_root):
 
 def test_config_json_beats_the_default(fake_root):
     """The capability that justified keeping the keys: a network folder."""
-    _write_config(fake_root, PATH_IN=r'\\servidor\setor\entrada')
+    _write_config(fake_root, PATH_IN=r'\\fileserver\department\input')
 
     settings = Settings()
 
-    assert settings.PATH_IN == r'\\servidor\setor\entrada'
+    assert settings.PATH_IN == r'\\fileserver\department\input'
     assert settings.PATH_OUT == str(fake_root / 'output')
 
 

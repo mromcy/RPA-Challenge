@@ -117,9 +117,9 @@ def project(tmp_path, monkeypatch):
     monkeypatch.setattr(settings_module, '_REPO_ROOT', tmp_path)
     (tmp_path / 'config.json').write_text(json.dumps(CONFIG), encoding='utf-8')
 
-    entrada = tmp_path / 'input'
-    entrada.mkdir()
-    pd.DataFrame(_rows(*NAMES)).to_excel(entrada / 'challenge.xlsx', index=False)
+    input_folder = tmp_path / 'input'
+    input_folder.mkdir()
+    pd.DataFrame(_rows(*NAMES)).to_excel(input_folder / 'challenge.xlsx', index=False)
 
     monkeypatch.setattr(execute_module, 'DATABASE', False)
     return tmp_path

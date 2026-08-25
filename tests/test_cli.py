@@ -13,7 +13,7 @@ import pytest
 
 from resources.cli import driver_from_argv, extract_driver
 
-MAESTRO = ['https://servidor.botcity', '12345', 'token-secreto', 'minha-org']
+MAESTRO = ['https://server.botcity', '12345', 'secret-token', 'my-org']
 
 
 def test_no_driver_returns_none_and_leaves_the_command_line_alone():

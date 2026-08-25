@@ -31,10 +31,13 @@ names the driver that broke without anyone opening a log.
 
 **The type checker is what makes the `BrowserDriver` Protocol a contract.**
 Structural conformance is checked statically or not at all, so `mypy` runs in CI
-next to ruff. Turning it on paid for itself immediately: `warn_unused_ignores`
-found that **11 of the project's 22 `# type: ignore` comments suppressed
-nothing** — they had been written for the editor's checker and carried error
-codes that no tool ever read. They are gone.
+next to ruff. Turning it on paid for itself immediately. The project carried 20
+suppression comments, and `warn_unused_ignores` proved that **11 of them
+suppressed nothing**: they had been written for the editor's checker, which
+ignores the error code in the brackets, so those codes had never been read by
+anything. Two more were `# pyright: ignore`, which mypy does not read at all —
+those were converted rather than deleted. Eleven suppressions are left, and each
+one now suppresses an error that a tool actually reports.
 
 **The fast lane needs no configuration at all.** No database, no `config.json`,
 no browser. That is a property held on purpose, and two tests assert it by

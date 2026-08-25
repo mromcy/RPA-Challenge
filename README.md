@@ -151,6 +151,7 @@ rpa_challenge/
 │       ├── credentials.json        # Fernet-encrypted user and password
 │       └── secret.key              # Fernet key
 ├── migrations/versions/            # Alembic migration history
+├── assets/                         # The demo GIF this README opens with
 ├── docs/                           # The long-form analysis this README links to
 ├── benchmarks/
 │   ├── compare_drivers.py          # The measured comparison
