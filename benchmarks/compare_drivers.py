@@ -167,7 +167,7 @@ def one_run(name: str, items: list[Item], path_browser: str) -> dict[str, float]
 
 def measure_file(path: Path) -> dict[str, int]:
     """
-    The size of a module in three counts (decision 14 in the progress notes).
+    The size of a module in three counts.
 
     `stmts` are executable statements from the syntax tree and measure how much
     the program does. `effective` are physical lines without docstrings,

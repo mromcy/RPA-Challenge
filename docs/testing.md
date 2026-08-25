@@ -35,9 +35,13 @@ next to ruff. Turning it on paid for itself immediately. The project carried 20
 suppression comments, and `warn_unused_ignores` proved that **11 of them
 suppressed nothing**: they had been written for the editor's checker, which
 ignores the error code in the brackets, so those codes had never been read by
-anything. Two more were `# pyright: ignore`, which mypy does not read at all —
-those were converted rather than deleted. Eleven suppressions are left, and each
-one now suppresses an error that a tool actually reports.
+anything. Two more were `# pyright: ignore`, which mypy does not read at all, and
+were converted rather than deleted. In the other direction, the checker's first
+run found two spots that genuinely needed suppressing and had none — SQLAlchemy
+generates the mapped classes' `__init__` at runtime, and no checker sees it.
+
+That is 20 − 11 + 2, which is where the eleven that remain come from. Each of
+them now suppresses an error some tool actually reports.
 
 **The fast lane needs no configuration at all.** No database, no `config.json`,
 no browser. That is a property held on purpose, and two tests assert it by

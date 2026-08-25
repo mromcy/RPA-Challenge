@@ -11,9 +11,9 @@ goes red for someone else's reason teaches a team to ignore red.
 
 The drivers are built **directly**, not through the factory: the factory would
 apply PATH_BROWSER from config.json, and with it filled both drivers would end
-up using the same browser — exactly the cross-browser coverage these tests
-exist to give (decision 12 in the progress notes). As a useful side effect, the
-suite runs with no config.json at all.
+up using the same browser, costing exactly the cross-browser coverage these
+tests exist to give. As a useful side effect, the suite runs with no
+config.json at all.
 """
 
 from pathlib import Path
